@@ -32,10 +32,10 @@ jobs:
         
     - name: Maven Get Version
       run: |
-        echo ::set-env name=MVN_CURRENT_VERSION::$(mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
+        echo ::set-env name=MVN_CURRENT_VERSION::$(mvn -B -f /home/runner/work/smart-data-lake/spark-extensions/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec)
     - name: Set Release Version
       run: |
-        echo ::set-env name=MVN_RELEASE_VERSION::$(mvn -B -f /home/runner/work/smart-data-lake/smart-data-lake/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec | sed 's/-SNAPSHOT//g')
+        echo ::set-env name=MVN_RELEASE_VERSION::$(mvn -B -f /home/runner/work/smart-data-lake/spark-extensions/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec | sed 's/-SNAPSHOT//g')
     #- name: Printenv
     #  run: |
     #    echo "MVN_CURRENT_VERSION=${MVN_CURRENT_VERSION}
