@@ -1,0 +1,344 @@
+<!--
+  ~ Licensed to the Apache Software Foundation (ASF) under one or more
+  ~ contributor license agreements.  See the NOTICE file distributed with
+  ~ this work for additional information regarding copyright ownership.
+  ~ The ASF licenses this file to You under the Apache License, Version 2.0
+  ~ (the "License"); you may not use this file except in compliance with
+  ~ the License.  You may obtain a copy of the License at
+  ~
+  ~    http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing, software
+  ~ distributed under the License is distributed on an "AS IS" BASIS,
+  ~ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  ~ See the License for the specific language governing permissions and
+  ~ limitations under the License.
+  -->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>io.smartdatalake</groupId>
+	<artifactId>spark-extensions_${scala.minor.version}</artifactId>
+	<version>1.0.0</version>
+	<packaging>jar</packaging>
+
+	<licenses>
+		<license>
+			<name>Apache 2.0 License</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
+		</license>
+	</licenses>
+
+	<!-- Used for license header by maven-license-plugin -->
+	<name>Spark extensions</name>
+	<description>Spark extensions for SmartDataLakeBuilder</description>
+	<url>http://www.smartdatalake.io</url>
+	<inceptionYear>2019</inceptionYear>
+	<organization>
+		<name>ELCA Informatique SA</name>
+		<url>https://www.elca.ch</url>
+	</organization>
+
+	<developers>
+		<developer>
+			<name>Smart Data Lake</name>
+			<email>smartdatalake@elca.ch</email>
+			<organization>ELCA Informatik AG</organization>
+			<organizationUrl>http://www.elca.ch</organizationUrl>
+		</developer>
+	</developers>
+
+	<profiles>
+		<profile>
+			<id>scala-2.12</id>
+			<properties>
+				<scala.minor.version>2.12</scala.minor.version>
+				<scala.version>${scala.minor.version}.10</scala.version>
+			</properties>
+		</profile>
+		<profile>
+			<id>scala-2.11</id>
+			<activation><activeByDefault>true</activeByDefault></activation>
+			<properties>
+				<scala.minor.version>2.11</scala.minor.version>
+				<scala.version>${scala.minor.version}.12</scala.version>
+			</properties>
+		</profile>
+	</profiles>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<skip.assembly>true</skip.assembly>
+		<noLinkWarnings>-unchecked</noLinkWarnings>
+
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+		<maven.compiler.release>8</maven.compiler.release>
+
+		<spark.version>2.4.4</spark.version>
+
+		<scalatest.version>3.0.1</scalatest.version>
+
+		<license-maven-plugin.version>3.0</license-maven-plugin.version>
+	</properties>
+
+	<distributionManagement>
+		<repository>
+			<id>bintray-smart-data-lake-smart-data-lake</id>
+			<name>smart-data-lake-smart-data-lake</name>
+			<url>https://api.bintray.com/maven/smart-data-lake/smart-data-lake/spark-extensions/;publish=1</url>
+		</repository>
+	</distributionManagement>
+
+	<scm>
+		<connection>scm:git:git://github.com/smart-data-lake/spark-extensions.git</connection>
+		<developerConnection>scm:git:ssh://github.com/smart-data-lake/spark-extensions.git</developerConnection>
+		<url>http://github.com/smart-data-lake/spark-extensions/tree/master</url>
+	</scm>
+
+	<repositories>
+		<repository>
+			<id>spring-plugins</id>
+			<name>Spring Plugins Repository</name>
+			<url>https://repo.spring.io/plugins-release/</url>
+		</repository>
+	</repositories>
+
+	<build>
+		<sourceDirectory>src/main/scala</sourceDirectory>
+		<testSourceDirectory>src/test/scala</testSourceDirectory>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+			</resource>
+			<resource>
+				<targetPath>META-INF</targetPath>
+				<directory>${basedir}</directory>
+				<filtering>false</filtering>
+				<includes>
+					<include>COPYING</include> <!-- the file containing the license text -->
+					<include>NOTICE</include> <!-- the file containing the license text -->
+				</includes>
+			</resource>
+		</resources>
+		<testResources>
+			<testResource>
+				<directory>src/test/resources</directory>
+			</testResource>
+		</testResources>
+
+		<plugins>
+			<!-- Compiles Scala sources. -->
+			<plugin>
+				<groupId>net.alchim31.maven</groupId>
+				<artifactId>scala-maven-plugin</artifactId>
+				<version>4.3.1</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>compile</goal>
+							<goal>testCompile</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<scalaCompatVersion>${scala.minor.version}</scalaCompatVersion>
+					<checkMultipleScalaVersions>true</checkMultipleScalaVersions>
+					<failOnMultipleScalaVersions>true</failOnMultipleScalaVersions>
+					<recompileMode>incremental</recompileMode>
+					<args>
+						<arg>-unchecked</arg>
+						<arg>-deprecation</arg>
+						<arg>-feature</arg>
+						<arg>-explaintypes</arg>
+						<arg>-target:jvm-1.8</arg>
+						<arg>${noLinkWarnings}</arg>
+					</args>
+					<jvmArgs>
+						<jvmArg>-Xms64m</jvmArg>
+						<jvmArg>-Xmx1024m</jvmArg>
+					</jvmArgs>
+				</configuration>
+			</plugin>
+
+			<!-- rewrite pom for compiling with different scala version profiles -->
+			<plugin>
+				<groupId>org.spurint.maven.plugins</groupId>
+				<artifactId>scala-cross-maven-plugin</artifactId>
+				<version>0.2.1</version>
+				<executions>
+					<execution>
+						<id>rewrite-pom</id>
+						<goals>
+							<goal>rewrite-pom</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Copies files in resources folders to target folder. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+				<version>3.1.0</version>
+			</plugin>
+
+			<!-- Checks whether source files have the specified license header. -->
+			<plugin>
+				<groupId>com.mycila</groupId>
+				<artifactId>license-maven-plugin</artifactId>
+				<version>${license-maven-plugin.version}</version>
+				<configuration>
+					<header>src/license/apachev2-header.txt</header>
+					<properties>
+						<copyright.name>${project.organization.name}</copyright.name>
+						<copyright.contact>${project.organization.url}</copyright.contact>
+					</properties>
+					<includes>
+						<include>src/**</include>
+					</includes>
+					<mapping>
+						<scala>SLASHSTAR_STYLE</scala>
+					</mapping>
+					<failIfMissing>false</failIfMissing>
+				</configuration>
+				<dependencies>
+					<dependency>
+						<groupId>com.mycila</groupId>
+						<artifactId>license-maven-plugin-git</artifactId>
+						<version>${license-maven-plugin.version}</version>
+					</dependency>
+				</dependencies>
+				<executions>
+					<execution>
+						<!--<phase>process-sources</phase>-->
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Creates the jar without dependencies -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.1.2</version>
+			</plugin>
+
+			<!-- Creates a JAR file with the source files of the project. -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<goals>
+							<goal>jar-no-fork</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Executes units tests with scalatest  -->
+			<plugin>
+				<groupId>org.scalatest</groupId>
+				<artifactId>scalatest-maven-plugin</artifactId>
+				<version>2.0.0</version>
+				<configuration>
+					<reportsDirectory>
+						${project.build.directory}/scalatest-reports
+					</reportsDirectory>
+					<junitxml>.</junitxml>
+					<filereports>
+						${project.artifactId}.txt
+					</filereports>
+					<stdout>WT</stdout>  <!-- without color, show reminder of failed and canceled tests with short stack traces, see: http://www.scalatest.org/user_guide/using_scalatest_with_sbt-->
+					<environmentVariables>
+						<SPARK_LOCAL_IP>127.0.0.1</SPARK_LOCAL_IP> <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
+					</environmentVariables>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>test</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Allows handling of version numbers -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>versions-maven-plugin</artifactId>
+				<version>2.7</version>
+			</plugin>
+
+			<!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<version>3.1.1</version>
+				<configuration>
+					<failOnWarning>false</failOnWarning>
+					<ignoreNonCompile>true</ignoreNonCompile>
+					<ignoredUsedUndeclaredDependencies>
+						<dependency>org.scalacheck:scalacheck_${scala.minor.version}</dependency>
+					</ignoredUsedUndeclaredDependencies>
+				</configuration>
+				<executions>
+					<execution>
+						<goals>
+							<goal>analyze-only</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+
+		</plugins>
+
+	</build>
+
+	<dependencies>
+
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-core_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-sql_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-catalyst_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.spark</groupId>
+			<artifactId>spark-avro_${scala.minor.version}</artifactId>
+			<version>${spark.version}</version>
+			<scope>runtime</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>org.apache.avro</groupId>
+			<artifactId>avro</artifactId>
+			<version>1.8.2</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.scalatest</groupId>
+			<artifactId>scalatest_${scala.minor.version}</artifactId>
+			<version>${scalatest.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+	</dependencies>
+</project>
