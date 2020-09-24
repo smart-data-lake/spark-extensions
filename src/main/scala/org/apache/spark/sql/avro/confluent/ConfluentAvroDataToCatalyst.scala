@@ -34,16 +34,21 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
 
   override def inputTypes: Seq[AbstractDataType] = Seq(BinaryType)
 
-  override lazy val dataType: DataType = MySchemaConverters.toSqlType(tgtSchema).dataType
+  override lazy val dataType: DataType = tgtDataType
 
   override def nullable: Boolean = true
 
-  @transient private lazy val (tgtSchemaId,tgtSchema) = confluentHelper.getLatestSchemaFromConfluent(subject)
-
-  @transient private lazy val reader = new GenericDatumReader[Any](tgtSchema)
-
+  // prepare reader and deserializer for avro schema
+  @transient private lazy val (tgtDataType, tgtSchemaId, tgtReader, tgtDeserializer) = {
+    // Avro schema is not serializable. We must be careful to not store it in an attribute of the class.
+    val (schemaId, schema) = confluentHelper.getLatestSchemaFromConfluent(subject)
+    val dataType = MySchemaConverters.toSqlType(schema).dataType
+    val reader = new GenericDatumReader[Any](schema)
+    val deserializer = new AvroDeserializer(schema, dataType)
+    (dataType, schemaId, reader, deserializer)
+  }
   // To decode a message we need to use the schema referenced by the message. Therefore we might need different deserializers.
-  @transient private lazy val deserializers = mutable.Map(tgtSchemaId -> new AvroDeserializer(tgtSchema, dataType))
+  @transient private lazy val deserializers = mutable.Map(tgtSchemaId -> tgtDeserializer)
 
   @transient private var decoder: BinaryDecoder = _
 
@@ -54,7 +59,7 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
     val (schemaId,avroMsg) = parseConfluentMsg(binary)
     val (_,msgSchema) = confluentHelper.getSchemaFromConfluent(schemaId)
     decoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, decoder)
-    result = reader.read(result, decoder)
+    result = tgtReader.read(result, decoder)
     deserializers.getOrElseUpdate(schemaId, new AvroDeserializer(msgSchema, dataType))
       .deserialize(result)
   }
