@@ -64,7 +64,7 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
       .deserialize(result)
   }
 
-  override def prettyName: String = "from_avro"
+  override def prettyName: String = "from_confluent_avro"
 
   override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     val expr = ctx.addReferenceObj("this", this)
