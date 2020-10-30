@@ -17,7 +17,7 @@
 
 package org.apache.spark.sql
 
-class DatasetHelper {
+object DatasetHelper {
 
   /**
    * Show Dataset but return string instead of writing to stdout
