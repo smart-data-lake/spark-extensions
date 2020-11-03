@@ -19,7 +19,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>spark-extensions_${scala.minor.version}</artifactId>
-	<version>1.0.0</version>
+	<version>1.2.0-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<licenses>
@@ -75,12 +75,10 @@
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<maven.compiler.release>8</maven.compiler.release>
 
-		<spark.version>2.4.4</spark.version>
-		<avro.version>1.8.2</avro.version>
+		<spark.version>2.4.6</spark.version>
+		<confluent.version>5.4.1</confluent.version>
 
 		<scalatest.version>3.0.1</scalatest.version>
-
-		<license-maven-plugin.version>3.0</license-maven-plugin.version>
 	</properties>
 
 	<distributionManagement>
@@ -193,7 +191,7 @@
 			<plugin>
 				<groupId>com.mycila</groupId>
 				<artifactId>license-maven-plugin</artifactId>
-				<version>${license-maven-plugin.version}</version>
+				<version>3.0</version>
 				<configuration>
 					<header>src/license/apachev2-header.txt</header>
 					<properties>
@@ -212,7 +210,7 @@
 					<dependency>
 						<groupId>com.mycila</groupId>
 						<artifactId>license-maven-plugin-git</artifactId>
-						<version>${license-maven-plugin.version}</version>
+						<version>3.0</version>
 					</dependency>
 				</dependencies>
 				<executions>
@@ -230,6 +228,12 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-jar-plugin</artifactId>
 				<version>3.1.2</version>
+				<configuration>
+					<excludes>
+						<exclude>log4j.properties</exclude> <!-- Logging configuration should be left to user. -->
+						<exclude>${project.artifactId}*.jar</exclude> <!-- avoid "Error assembling JAR" because of already existing artifact jar -->
+					</excludes>
+				</configuration>
 			</plugin>
 
 			<!-- Creates a JAR file with the source files of the project. -->
@@ -245,6 +249,11 @@
 						</goals>
 					</execution>
 				</executions>
+				<configuration>
+					<excludes>
+						<exclude>log4j.properties</exclude> <!-- Logging configuration source should not be distributed. -->
+					</excludes>
+				</configuration>
 			</plugin>
 
 			<!-- Executes units tests with scalatest  -->
@@ -281,29 +290,7 @@
 				<version>2.7</version>
 			</plugin>
 
-			<!-- Checks for declared but unused and undeclared but used dependencies in the verify stage -->
-			<plugin>
-				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-dependency-plugin</artifactId>
-				<version>3.1.1</version>
-				<configuration>
-					<failOnWarning>false</failOnWarning>
-					<ignoreNonCompile>true</ignoreNonCompile>
-					<ignoredUsedUndeclaredDependencies>
-						<dependency>org.scalacheck:scalacheck_${scala.minor.version}</dependency>
-					</ignoredUsedUndeclaredDependencies>
-				</configuration>
-				<executions>
-					<execution>
-						<goals>
-							<goal>analyze-only</goal>
-						</goals>
-					</execution>
-				</executions>
-			</plugin>
-
 		</plugins>
-
 	</build>
 
 	<dependencies>
@@ -337,16 +324,9 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.apache.avro</groupId>
-			<artifactId>avro</artifactId>
-			<version>${avro.version}</version>
-			<scope>provided</scope>
-		</dependency>
-
-		<dependency>
 			<groupId>io.confluent</groupId>
 			<artifactId>kafka-schema-registry-client</artifactId>
-			<version>5.4.1</version>
+			<version>${confluent.version}</version>
 			<exclusions>
 				<exclusion>
 					<groupId>org.apache.avro</groupId>

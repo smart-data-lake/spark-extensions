@@ -33,14 +33,16 @@ case class CatalystDataToConfluentAvro(child: Expression, subject: String, confl
 
   override def dataType: DataType = BinaryType
 
-  @transient private lazy val newSchema = MySchemaConverters.toAvroType(child.dataType, child.nullable)
-
-  @transient private lazy val (id,targetSchema) = if (updateAllowed) confluentHelper.setOrUpdateSchema(subject, newSchema, mutualReadCheck)
-  else confluentHelper.setOrGetSchema(subject, newSchema)
-
-  @transient private lazy val serializer = new MyAvroSerializer(child.dataType, targetSchema, child.nullable)
-
-  @transient private lazy val writer = new GenericDatumWriter[Any](targetSchema)
+  // prepare serializer and writer for avro schema of subject
+  @transient private lazy val (schemaId, serializer, writer) = {
+    // Avro schema is not serializable. We must be careful to not store it in an attribute of the class.
+    val newSchema = MySchemaConverters.toAvroType(child.dataType, child.nullable)
+    val (schemaId, schema) = if (updateAllowed) confluentHelper.setOrUpdateSchema(subject, newSchema, mutualReadCheck)
+    else confluentHelper.setOrGetSchema(subject, newSchema)
+    val serializer = new MyAvroSerializer(child.dataType, schema, child.nullable)
+    val writer = new GenericDatumWriter[Any](schema)
+    (schemaId, serializer, writer)
+  }
 
   @transient private var encoder: BinaryEncoder = _
 
@@ -56,7 +58,7 @@ case class CatalystDataToConfluentAvro(child: Expression, subject: String, confl
 
   override def nullSafeEval(input: Any): Any = {
     out.reset()
-    appendSchemaId(id, out)
+    appendSchemaId(schemaId, out)
     encoder = EncoderFactory.get().directBinaryEncoder(out, encoder)
     val avroData = serializer.serialize(input)
     writer.write(avroData, encoder)
@@ -64,7 +66,7 @@ case class CatalystDataToConfluentAvro(child: Expression, subject: String, confl
     out.toByteArray
   }
 
-  override def prettyName: String = "to_avro"
+  override def prettyName: String = "to_confluent_avro"
 
   override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
     val expr = ctx.addReferenceObj("this", this)
