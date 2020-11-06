@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Project}
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{Column, Encoders}
+import org.apache.spark.unsafe.types.UTF8String
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
@@ -59,7 +60,11 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
   // evaluate expression on object
   def apply(v: T): R = {
     val row = rowSerializer.apply(v)
-    expr.eval(row).asInstanceOf[R]
+    val result = expr.eval(row) match {
+      case x: UTF8String => x.toString // convert Spark String type to scala
+      case x => x
+    }
+    result.asInstanceOf[R]
   }
 }
 

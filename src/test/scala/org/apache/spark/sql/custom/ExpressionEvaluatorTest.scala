@@ -1,0 +1,56 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one or more
+ * contributor license agreements.  See the NOTICE file distributed with
+ * this work for additional information regarding copyright ownership.
+ * The ASF licenses this file to You under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance with
+ * the License.  You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.apache.spark.sql.custom
+
+import org.apache.spark.sql.Row
+import org.scalatest.FunSuite
+import org.apache.spark.sql.functions._
+
+class ExpressionEvaluatorTest extends FunSuite {
+
+  case class Entry(y: String, z: Int)
+  case class TestObj(s: Seq[Entry], m: Map[String,Entry], a: Float, b: String)
+
+  private val input = TestObj(
+    s = Seq(Entry("test0",0), Entry("test1",1)),
+    m = Map("test2" -> Entry("test2",2), "test3" -> Entry("test3",3)),
+    a = 1.5f,
+    b = "ok"
+  )
+
+  test("evaluate expression with functions") {
+    val expression = "concat(b, '-', cast(a * 2 as int))"
+    val evaluator = new ExpressionEvaluator[TestObj,String](expr(expression))
+    val result = evaluator.apply(input)
+    assert(result == "ok-3")
+  }
+
+  test("evaluate expression with functions on list") {
+    val expression = "array_max(transform( s, entry -> entry.z ))"
+    val evaluator = new ExpressionEvaluator[TestObj,Int](expr(expression))
+    val result = evaluator.apply(input)
+    assert(result == 1)
+  }
+
+  test("evaluate expression with functions on map") {
+    val expression = "m['test2'].z + m['test3'].z"
+    val evaluator = new ExpressionEvaluator[TestObj,Int](expr(expression))
+    val result = evaluator.apply(input)
+    assert(result == 5)
+  }
+}
