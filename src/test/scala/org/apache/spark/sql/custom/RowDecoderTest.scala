@@ -23,12 +23,20 @@ import org.scalatest.FunSuite
 class RowDecoderTest extends FunSuite {
 
   test("decode row with nested type") {
-    val row = Row(Row(true, "test"), Row(true, "test"), 0f)
+    val row = Row(Row(true, "test"), Row(true, "test"), 0f, "ok")
     val decoder = new RowDecoder[TestFlags]
     val prfFlags = decoder.convert(row)
-    assert(prfFlags == TestFlags(Flag(true,"test"), Flag(true,"test"), 0f))
+    assert(prfFlags == TestFlags(Flag(true,"test"), Flag(true,"test"), 0f, Some("ok")))
   }
+
+  test("decode row with null value") {
+    val row = Row(Row(true, "test"), Row(true, "test"), 0f, null)
+    val decoder = new RowDecoder[TestFlags]
+    val prfFlags = decoder.convert(row)
+    assert(prfFlags == TestFlags(Flag(true,"test"), Flag(true,"test"), 0f, None))
+  }
+
 }
 
 case class Flag(x: Boolean, y: String)
-case class TestFlags(a: Flag, b:Flag, c:Float)
+case class TestFlags(a: Flag, b:Flag, c:Float, d: Option[String])
