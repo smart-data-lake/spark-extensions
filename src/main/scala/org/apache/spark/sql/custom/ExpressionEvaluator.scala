@@ -17,12 +17,11 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.sql.catalyst.analysis.{Analyzer, FakeV2SessionCatalog, FunctionRegistry}
+import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.BindReferences
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Project}
-import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{Column, Encoders}
 import org.apache.spark.unsafe.types.UTF8String
@@ -41,7 +40,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
 
   // prepare evaluator (this is Spark internal API)
   private val encoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
-  private val rowSerializer = encoder.createSerializer()
+  private val rowSerializer = encoder.toRow _
   private val expr = {
     val attributes = encoder.schema.toAttributes
     val localRelation = LocalRelation(attributes)
@@ -75,6 +74,6 @@ object ExpressionEvaluator {
     val simpleCatalog = new SessionCatalog( new InMemoryCatalog, FunctionRegistry.builtin, sqlConf) {
       override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
     }
-    new Analyzer(new CatalogManager(sqlConf, FakeV2SessionCatalog, simpleCatalog), sqlConf)
+    new Analyzer(simpleCatalog, sqlConf)
   }
 }
