@@ -23,6 +23,13 @@ import org.apache.spark.sql.{Encoders, Row}
 
 import scala.reflect.runtime.universe._
 
+/**
+ * Spark row to case class Decoder.
+ * This can be used for example in UDF's with struct parameters, which are mapped as Row in Spark 2.x (Spark 3.x supports case classes as parameters directly)
+ * If you have to decode multiple rows (like in a UDF) it's important to instantiate the RowDecoder only once (outside the UDF) and reuse it for all rows.
+ *
+ * @tparam T the case class to be produced
+ */
 class RowDecoder[T <: Product : TypeTag] extends Serializable {
 
   private val encoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
@@ -30,6 +37,9 @@ class RowDecoder[T <: Product : TypeTag] extends Serializable {
   private val resolvedEncoder = encoder.resolveAndBind(encoder.schema.toAttributes)
   private val rowDeserializer = resolvedEncoder.deserializer
 
+  /**
+   * Decode Spark row to case class
+   */
   def convert(row: Row): T = {
     rowDeserializer.eval(internalRowConverter(row).asInstanceOf[InternalRow]).asInstanceOf[T]
   }
