@@ -17,14 +17,10 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.sql.Row
-import org.scalatest.FunSuite
 import org.apache.spark.sql.functions._
+import org.scalatest.FunSuite
 
 class ExpressionEvaluatorTest extends FunSuite {
-
-  case class Entry(y: String, z: Int)
-  case class TestObj(s: Seq[Entry], m: Map[String,Entry], a: Float, b: String)
 
   private val input = TestObj(
     s = Seq(Entry("test0",0), Entry("test1",1)),
@@ -54,3 +50,6 @@ class ExpressionEvaluatorTest extends FunSuite {
     assert(result == 5)
   }
 }
+
+case class Entry(y: String, z: Int)
+case class TestObj(s: Seq[Entry], m: Map[String,Entry], a: Float, b: String)

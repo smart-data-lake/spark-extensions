@@ -22,9 +22,6 @@ import org.scalatest.FunSuite
 
 class RowDecoderTest extends FunSuite {
 
-  case class Flag(x: Boolean, y: String)
-  case class TestFlags(a: Flag, b:Flag, c:Float)
-
   test("decode row with nested type") {
     val row = Row(Row(true, "test"), Row(true, "test"), 0f)
     val decoder = new RowDecoder[TestFlags]
@@ -32,3 +29,6 @@ class RowDecoderTest extends FunSuite {
     assert(prfFlags == TestFlags(Flag(true,"test"), Flag(true,"test"), 0f))
   }
 }
+
+case class Flag(x: Boolean, y: String)
+case class TestFlags(a: Flag, b:Flag, c:Float)
