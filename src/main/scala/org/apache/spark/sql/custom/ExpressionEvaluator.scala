@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.custom
 
+import org.apache.spark.sql.catalyst.CatalystTypeConverters
 import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -24,7 +25,6 @@ import org.apache.spark.sql.catalyst.expressions.BindReferences
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Project}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{Column, Encoders}
-import org.apache.spark.unsafe.types.UTF8String
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
@@ -49,20 +49,21 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
     val resolvedExpr = resolvedPlan.projectList.head
     BindReferences.bindReference(resolvedExpr, attributes)
   }
+  private val resultDataType = ExpressionEncoder[R].schema.head.dataType
+  private val scalaConverter = CatalystTypeConverters.createToScalaConverter(resultDataType)
+
+  // check if expression is fully resolved
+  require(expr.resolved, s"expression can not be resolved")
 
   // check if resulting datatype matches
   if (classTagR.runtimeClass != classOf[Any]) {
-    val resultDataType = ExpressionEncoder[R].schema.head.dataType
     require(expr.dataType == resultDataType, s"expression result data type ${expr.dataType} does not match requested datatype $resultDataType")
   }
 
   // evaluate expression on object
   def apply(v: T): R = {
     val row = rowSerializer.apply(v)
-    val result = expr.eval(row) match {
-      case x: UTF8String => x.toString // convert Spark String type to scala
-      case x => x
-    }
+    val result = scalaConverter(expr.eval(row))
     result.asInstanceOf[R]
   }
 }
