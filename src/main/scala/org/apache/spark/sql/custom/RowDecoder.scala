@@ -35,12 +35,12 @@ class RowDecoder[T <: Product : TypeTag] extends Serializable {
   private val encoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
   private val internalRowConverter = CatalystTypeConverters.createToCatalystConverter(encoder.schema)
   private val resolvedEncoder = encoder.resolveAndBind(encoder.schema.toAttributes)
-  private val rowDeserializer = resolvedEncoder.deserializer
+  private val rowDeserializer = resolvedEncoder.fromRow _
 
   /**
    * Decode Spark row to case class
    */
   def convert(row: Row): T = {
-    rowDeserializer.eval(internalRowConverter(row).asInstanceOf[InternalRow]).asInstanceOf[T]
+    rowDeserializer(internalRowConverter(row).asInstanceOf[InternalRow])
   }
 }
