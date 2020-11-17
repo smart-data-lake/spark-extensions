@@ -39,7 +39,8 @@ jobs:
       run: |
         echo 'MVN_RELEASE_VERSION<<EOF' >> $GITHUB_ENV
         mvn -B -f /home/runner/work/spark-extensions/spark-extensions/pom.xml -q -Dexec.executable=echo -Dexec.args='${project.version}' --non-recursive exec:exec | sed 's/-SNAPSHOT//g' >> $GITHUB_ENV
-        echo 'EOF' >> $GITHUB_ENV    #- name: Printenv
+        echo 'EOF' >> $GITHUB_ENV
+    #- name: Printenv
     #  run: |
     #    echo "MVN_CURRENT_VERSION=${MVN_CURRENT_VERSION}
     #    echo "MVN_RELEASE_VERSION=${MVN_RELEASE_VERSION}
