@@ -36,7 +36,14 @@ class RowDecoderTest extends FunSuite {
     assert(prfFlags == TestFlags(Flag(true,"test"), Flag(true,"test"), 0f, None))
   }
 
+  test("decode row with map and nested product") {
+    val row = Row("test", Map("flagA" -> Row(true, "resultA")))
+    val decoder = new RowDecoder[MapsOfFlags]
+    val prfFlags = decoder.convert(row)
+    assert(prfFlags == MapsOfFlags("test", Map("flagA"->Flag(true,"resultA"))))
+  }
 }
 
 case class Flag(x: Boolean, y: String)
 case class TestFlags(a: Flag, b:Flag, c:Float, d: Option[String])
+case class MapsOfFlags(a: String, b: Map[String,Flag] )
