@@ -41,7 +41,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
 
   // prepare evaluator (this is Spark internal API)
   private val dataEncoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
-  private val dataSerializer = dataEncoder.toRow _
+  private val dataSerializer = dataEncoder.createSerializer
   private val expr = {
     val attributes = dataEncoder.schema.toAttributes
     val localRelation = LocalRelation(attributes)
@@ -63,7 +63,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
     // check if resulting datatype matches
     require(expr.dataType == dataType, s"expression result data type ${expr.dataType} does not match requested datatype $dataType")
     val resolvedEncoder = encoder.resolveAndBind(encoder.schema.toAttributes)
-    val deserializer = (result: Any) => resolvedEncoder.fromRow(InternalRow(result))
+    val deserializer = (result: Any) => resolvedEncoder.createDeserializer()(InternalRow(result))
     (dataType, deserializer)
   } else {
     val scalaConverter = CatalystTypeConverters.createToScalaConverter(expr.dataType)
@@ -72,7 +72,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
 
   // evaluate expression on object
   def apply(v: T): R = {
-    val dataRow = dataSerializer.apply(v)
+    val dataRow = dataSerializer(v)
     val exprResult = expr.eval(dataRow)
     val result = resultDeserializer(exprResult)
     result
