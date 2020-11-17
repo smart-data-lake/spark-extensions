@@ -63,6 +63,12 @@ class ExpressionEvaluatorTest extends FunSuite {
     val result = evaluator.apply(input)
     assert(result == 1.5f)
   }
+
+  test("evaluate expression: exception with unknown attribute contains its name") {
+    val expression = "concat(s[0].y, b, abc)"
+    val ex = intercept[IllegalArgumentException](new ExpressionEvaluator[TestObj,Any](expr(expression)))
+    assert(ex.getMessage.contains("abc"))
+  }
 }
 
 case class Entry(y: String, z: Int)

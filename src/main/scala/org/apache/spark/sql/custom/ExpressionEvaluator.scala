@@ -17,12 +17,13 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry}
+import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry, UnresolvedAttribute}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.catalyst.expressions.BindReferences
+import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Project}
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
+import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{Column, Encoders}
 
@@ -52,8 +53,10 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
   }
 
   // check if expression is fully resolved
-  // TODO: try to find unresolved attribute names
-  require(expr.resolved, s"expression can not be resolved")
+  require(expr.resolved, {
+    val attrs = findUnresolvedAttributes(expr).map(_.name)
+    "expression can not be resolved" + (if (attrs.nonEmpty) s", unresolved attributes are ${attrs.mkString(", ")}" else "")
+  })
 
   // prepare result deserializer
   // If result type is any, we just convert types to scala, but there is no decoding into case classes possible.
@@ -83,9 +86,17 @@ object ExpressionEvaluator {
   // create a simple catalyst analyzer supporting builtin functions
   private lazy val analyzer: Analyzer = {
     val sqlConf = new SQLConf().copy(SQLConf.CASE_SENSITIVE -> true) // resolve identifiers in expressions case-sensitive
-    val simpleCatalog = new SessionCatalog( new InMemoryCatalog, FunctionRegistry.builtin, sqlConf) {
+    val simpleCatalog = new SessionCatalog(new InMemoryCatalog, FunctionRegistry.builtin, sqlConf) {
       override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
     }
     new Analyzer(simpleCatalog, sqlConf)
+  }
+
+  def findUnresolvedAttributes(expr: Expression): Seq[UnresolvedAttribute] = {
+    if (expr.resolved) Seq()
+    else expr match {
+      case attr: UnresolvedAttribute => Seq(attr)
+      case _ => expr.children.flatMap(findUnresolvedAttributes)
+    }
   }
 }
