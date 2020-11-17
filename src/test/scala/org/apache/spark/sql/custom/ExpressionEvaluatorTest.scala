@@ -43,11 +43,31 @@ class ExpressionEvaluatorTest extends FunSuite {
     assert(result == 1)
   }
 
-  test("evaluate expression with functions on map") {
+  test("evaluate expression on map") {
     val expression = "m['test2'].z + m['test3'].z"
     val evaluator = new ExpressionEvaluator[TestObj,Int](expr(expression))
     val result = evaluator.apply(input)
     assert(result == 5)
+  }
+
+  test("evaluate expression returning complex type") {
+    val expression = "m"
+    val evaluator = new ExpressionEvaluator[TestObj,Map[String,Entry]](expr(expression))
+    val result = evaluator.apply(input)
+    assert(result.values.toSeq.head.z == 2)
+  }
+
+  test("evaluate expression with type any") {
+    val expression = "a"
+    val evaluator = new ExpressionEvaluator[TestObj,Any](expr(expression))
+    val result = evaluator.apply(input)
+    assert(result == 1.5f)
+  }
+
+  test("evaluate expression: exception with unknown attribute contains its name") {
+    val expression = "concat(s[0].y, b, abc)"
+    val ex = intercept[IllegalArgumentException](new ExpressionEvaluator[TestObj,Any](expr(expression)))
+    assert(ex.getMessage.contains("abc"))
   }
 }
 
