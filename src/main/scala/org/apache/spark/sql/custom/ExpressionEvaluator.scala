@@ -24,7 +24,7 @@ import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Project}
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
-import org.apache.spark.sql.expressions.{UserDefinedAggregator, UserDefinedFunction}
+import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{Column, Encoders}
 
@@ -103,14 +103,8 @@ object ExpressionEvaluator {
    * Note: this code is copied from Spark UDFRegistration.register
    */
   def registerUdf(name: String, udf: UserDefinedFunction): Unit = {
-    udf match {
-      case udaf: UserDefinedAggregator[_, _, _] =>
-        def builder(children: Seq[Expression]) = udaf.scalaAggregator(children)
-        functionRegistry.createOrReplaceTempFunction(name, builder)
-      case _ =>
-        def builder(children: Seq[Expression]) = udf.apply(children.map(Column.apply) : _*).expr
-        functionRegistry.createOrReplaceTempFunction(name, builder)
-    }
+    def builder(children: Seq[Expression]) = udf.apply(children.map(Column.apply) : _*).expr
+    functionRegistry.createOrReplaceTempFunction(name, builder)
   }
 
   private def findUnresolvedAttributes(expr: Expression): Seq[UnresolvedAttribute] = {
