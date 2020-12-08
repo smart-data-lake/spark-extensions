@@ -24,6 +24,7 @@ import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Project}
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
+import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.{Column, Encoders}
 
@@ -83,16 +84,30 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
 }
 
 object ExpressionEvaluator {
+
+  // keep our own function registry
+  private lazy val functionRegistry = FunctionRegistry.builtin.clone()
+
   // create a simple catalyst analyzer supporting builtin functions
   private lazy val analyzer: Analyzer = {
     val sqlConf = new SQLConf().copy(SQLConf.CASE_SENSITIVE -> true) // resolve identifiers in expressions case-sensitive
-    val simpleCatalog = new SessionCatalog(new InMemoryCatalog, FunctionRegistry.builtin, sqlConf) {
+    val simpleCatalog = new SessionCatalog(new InMemoryCatalog, functionRegistry, sqlConf) {
       override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
     }
     new Analyzer(simpleCatalog, sqlConf)
   }
 
-  def findUnresolvedAttributes(expr: Expression): Seq[UnresolvedAttribute] = {
+  /**
+   * Register a udf to be available in evaluating expressions.
+   *
+   * Note: this code is copied from Spark UDFRegistration.register
+   */
+  def registerUdf(name: String, udf: UserDefinedFunction): Unit = {
+    def builder(children: Seq[Expression]) = udf.apply(children.map(Column.apply) : _*).expr
+    functionRegistry.createOrReplaceTempFunction(name, builder)
+  }
+
+  private def findUnresolvedAttributes(expr: Expression): Seq[UnresolvedAttribute] = {
     if (expr.resolved) Seq()
     else expr match {
       case attr: UnresolvedAttribute => Seq(attr)
