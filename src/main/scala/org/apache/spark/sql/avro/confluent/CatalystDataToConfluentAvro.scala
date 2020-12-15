@@ -34,14 +34,15 @@ case class CatalystDataToConfluentAvro(child: Expression, subject: String, confl
   override def dataType: DataType = BinaryType
 
   // prepare serializer and writer for avro schema of subject
-  @transient private lazy val (schemaId, serializer, writer) = {
+  case class SerializerTools(schemaId: Int, serializer: MyAvroSerializer, writer: GenericDatumWriter[Any])
+  @transient private lazy val tgt = {
     // Avro schema is not serializable. We must be careful to not store it in an attribute of the class.
     val newSchema = MySchemaConverters.toAvroType(child.dataType, child.nullable)
     val (schemaId, schema) = if (updateAllowed) confluentHelper.setOrUpdateSchema(subject, newSchema, mutualReadCheck)
     else confluentHelper.setOrGetSchema(subject, newSchema)
     val serializer = new MyAvroSerializer(child.dataType, schema, child.nullable)
     val writer = new GenericDatumWriter[Any](schema)
-    (schemaId, serializer, writer)
+    SerializerTools(schemaId, serializer, writer)
   }
 
   @transient private var encoder: BinaryEncoder = _
@@ -52,16 +53,15 @@ case class CatalystDataToConfluentAvro(child: Expression, subject: String, confl
    * Instantiate serializer and writer for schema compatibility check
    */
   def test(): Unit = {
-    serializer
-    writer
+    tgt // initialize lazy value
   }
 
   override def nullSafeEval(input: Any): Any = {
     out.reset()
-    appendSchemaId(schemaId, out)
+    appendSchemaId(tgt.schemaId, out)
     encoder = EncoderFactory.get().directBinaryEncoder(out, encoder)
-    val avroData = serializer.serialize(input)
-    writer.write(avroData, encoder)
+    val avroData = tgt.serializer.serialize(input)
+    tgt.writer.write(avroData, encoder)
     encoder.flush()
     out.toByteArray
   }
