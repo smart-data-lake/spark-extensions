@@ -34,35 +34,31 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
 
   override def inputTypes: Seq[AbstractDataType] = Seq(BinaryType)
 
-  override lazy val dataType: DataType = tgt.dataType
+  override lazy val dataType: DataType = {
+    // Avro schema is not serializable. We must be careful to not store it in an attribute of the class.
+    val (schemaId, schema) = confluentHelper.getLatestSchemaFromConfluent(subject)
+    MySchemaConverters.toSqlType(schema).dataType
+  }
 
   override def nullable: Boolean = true
 
-  // prepare reader and deserializer for avro schema
-  case class DeserializerTools(dataType: DataType, schemaId: Int, reader: GenericDatumReader[Any], deserializer: AvroDeserializer)
-  @transient private lazy val tgt = {
-    // Avro schema is not serializable. We must be careful to not store it in an attribute of the class.
-    val (schemaId, schema) = confluentHelper.getLatestSchemaFromConfluent(subject)
-    val dataType = MySchemaConverters.toSqlType(schema).dataType
-    val reader = new GenericDatumReader[Any](schema)
-    val deserializer = new AvroDeserializer(schema, dataType)
-    DeserializerTools(dataType, schemaId, reader, deserializer)
-  }
-  // To decode a message we need to use the schema referenced by the message. Therefore we might need different deserializers.
-  @transient private lazy val deserializers = mutable.Map(tgt.schemaId -> tgt.deserializer)
-
-  @transient private var decoder: BinaryDecoder = _
-
-  @transient private var result: Any = _
+  // To read an avro message we need to use the schema referenced by the message. Therefore we might need different readers for different messages.
+  private val avroReaders = mutable.Map[Int, GenericDatumReader[Any]]()
+  // To deserialize a generic avro message to a Spark row we need to use the Avro schema referenced by the message. Therefore we might need different deserializers for different messages.
+  private val avro2SparkDeserializers = mutable.Map[Int, AvroDeserializer]()
+  // buffer objects for reuse
+  private var avroBinaryDecoder: BinaryDecoder = _
+  private var avroGenericMsg: Any = _
 
   override def nullSafeEval(input: Any): Any = {
     val binary = input.asInstanceOf[Array[Byte]]
     val (schemaId,avroMsg) = parseConfluentMsg(binary)
     val (_,msgSchema) = confluentHelper.getSchemaFromConfluent(schemaId)
-    decoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, decoder)
-    result = tgt.reader.read(result, decoder)
-    deserializers.getOrElseUpdate(schemaId, new AvroDeserializer(msgSchema, dataType))
-      .deserialize(result)
+    avroBinaryDecoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, avroBinaryDecoder)
+    val avroReader = avroReaders.getOrElse(schemaId, new GenericDatumReader[Any](msgSchema))
+    avroGenericMsg = avroReader.read(avroGenericMsg, avroBinaryDecoder)
+    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElse(schemaId, new AvroDeserializer(msgSchema, dataType))
+    avro2SparkDeserializer.deserialize(avroGenericMsg)
   }
 
   override def prettyName: String = "from_confluent_avro"
