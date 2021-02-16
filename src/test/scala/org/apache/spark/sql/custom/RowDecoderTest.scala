@@ -18,9 +18,9 @@
 package org.apache.spark.sql.custom
 
 import org.apache.spark.sql.Row
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class RowDecoderTest extends FunSuite {
+class RowDecoderTest extends AnyFunSuite {
 
   test("decode row with nested type") {
     val row = Row(Row(true, "test"), Row(true, "test"), 0f, "ok")
