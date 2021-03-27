@@ -58,7 +58,7 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
     val avroReader = avroReaders.getOrElse(schemaId, new GenericDatumReader[Any](msgSchema))
     avroGenericMsg = avroReader.read(avroGenericMsg, avroBinaryDecoder)
     val avro2SparkDeserializer = avro2SparkDeserializers.getOrElse(schemaId, new AvroDeserializer(msgSchema, dataType))
-    avro2SparkDeserializer.deserialize(avroGenericMsg)
+    avro2SparkDeserializer.deserialize(avroGenericMsg).orNull
   }
 
   override def prettyName: String = "from_confluent_avro"
