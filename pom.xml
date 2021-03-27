@@ -72,7 +72,7 @@
 		<scala.minor.version>2.12</scala.minor.version>
 		<scala.version>${scala.minor.version}.12</scala.version>
 
-		<spark.version>3.0.1</spark.version>
+		<spark.version>3.1.1</spark.version>
 		<confluent.version>5.4.1</confluent.version>
 
 		<scalatest.version>3.0.1</scalatest.version>

@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.custom
 
+import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.functions._
 import org.scalatest.FunSuite
 
@@ -68,6 +69,12 @@ class ExpressionEvaluatorTest extends FunSuite {
     val expression = "concat(s[0].y, b, abc)"
     val ex = intercept[IllegalArgumentException](new ExpressionEvaluator[TestObj,Any](expr(expression)))
     assert(ex.getMessage.contains("abc"))
+  }
+
+  test("evaluate expression: evaluation is case sensitive") {
+    val expression = "concat(s[0].Y, b)"
+    val ex = intercept[AnalysisException](new ExpressionEvaluator[TestObj,Any](expr(expression)))
+    assert(ex.getMessage.contains("Y"))
   }
 }
 
