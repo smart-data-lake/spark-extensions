@@ -19,9 +19,9 @@ package org.apache.spark.sql.custom
 
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.functions._
-import org.scalatest.FunSuite
+import org.scalatest.funsuite.AnyFunSuite
 
-class ExpressionEvaluatorTest extends FunSuite {
+class ExpressionEvaluatorTest extends AnyFunSuite {
 
   private val input = TestObj(
     s = Seq(Entry("test0",0), Entry("test1",1)),
