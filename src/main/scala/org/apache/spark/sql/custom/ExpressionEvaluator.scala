@@ -90,11 +90,14 @@ object ExpressionEvaluator {
 
   // create a simple catalyst analyzer supporting builtin functions
   private lazy val analyzer: Analyzer = {
-    val sqlConf = new SQLConf().copy(SQLConf.CASE_SENSITIVE -> true) // resolve identifiers in expressions case-sensitive
+    val sqlConf = new SQLConf()
+    sqlConf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
     val simpleCatalog = new SessionCatalog(new InMemoryCatalog, functionRegistry, sqlConf) {
       override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
     }
-    new Analyzer(simpleCatalog, sqlConf)
+    val analyzer = new Analyzer(simpleCatalog)
+    analyzer.conf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
+    analyzer
   }
 
   /**
