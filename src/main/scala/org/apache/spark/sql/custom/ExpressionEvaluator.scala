@@ -17,12 +17,13 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry, UnresolvedAttribute}
+import org.apache.spark.sql.catalyst.analysis.{Analyzer, FakeV2SessionCatalog, FunctionRegistry, Resolver, UnresolvedAttribute, caseSensitiveResolution}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Project}
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
+import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
 import org.apache.spark.sql.expressions.{UserDefinedAggregator, UserDefinedFunction}
 import org.apache.spark.sql.internal.SQLConf
@@ -95,9 +96,9 @@ object ExpressionEvaluator {
     val simpleCatalog = new SessionCatalog(new InMemoryCatalog, functionRegistry, sqlConf) {
       override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
     }
-    val analyzer = new Analyzer(simpleCatalog)
-    analyzer.conf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
-    analyzer
+    new Analyzer(new CatalogManager(FakeV2SessionCatalog, simpleCatalog)) {
+      override def resolver: Resolver = caseSensitiveResolution // resolve identifiers in expressions case-sensitive
+    }
   }
 
   /**
