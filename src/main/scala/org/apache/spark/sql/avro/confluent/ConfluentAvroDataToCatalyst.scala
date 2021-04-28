@@ -55,9 +55,9 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
     val (schemaId,avroMsg) = parseConfluentMsg(binary)
     val (_,msgSchema) = confluentHelper.getSchemaFromConfluent(schemaId)
     avroBinaryDecoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, avroBinaryDecoder)
-    val avroReader = avroReaders.getOrElse(schemaId, new GenericDatumReader[Any](msgSchema))
+    val avroReader = avroReaders.getOrElseUpdate(schemaId, new GenericDatumReader[Any](msgSchema))
     avroGenericMsg = avroReader.read(avroGenericMsg, avroBinaryDecoder)
-    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElse(schemaId, new AvroDeserializer(msgSchema, dataType))
+    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElseUpdate(schemaId, new AvroDeserializer(msgSchema, dataType))
     avro2SparkDeserializer.deserialize(avroGenericMsg)
   }
 
