@@ -26,6 +26,7 @@ import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
 import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.DataType
 import org.apache.spark.sql.{Column, Encoders}
 
 import scala.reflect.ClassTag
@@ -65,7 +66,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
     val encoder = ExpressionEncoder[R]
     val dataType = encoder.schema.head.dataType
     // check if resulting datatype matches
-    require(expr.dataType == dataType, s"expression result data type ${expr.dataType} does not match requested datatype $dataType")
+    require(DataType.equalsStructurally(expr.dataType, dataType, ignoreNullability = true), s"expression result data type ${expr.dataType} does not match requested datatype $dataType")
     val resolvedEncoder = encoder.resolveAndBind(encoder.schema.toAttributes)
     val deserializer = (result: Any) => resolvedEncoder.fromRow(InternalRow(result))
     (dataType, deserializer)
