@@ -17,11 +17,13 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry, UnresolvedAttribute}
+import org.apache.spark.sql.catalyst.analysis.{Analyzer, FunctionRegistry, Resolver, UnresolvedAttribute, caseSensitiveResolution}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Project}
+import org.apache.spark.sql.catalyst.optimizer.{ComputeCurrentTime, ReplaceExpressions}
+import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
 import org.apache.spark.sql.expressions.UserDefinedFunction
@@ -49,8 +51,11 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
     val attributes = dataEncoder.schema.toAttributes
     val localRelation = LocalRelation(attributes)
     val rawPlan = Project(Seq(exprCol.alias("test").named),localRelation)
-    val resolvedPlan = ExpressionEvaluator.analyzer.execute(rawPlan).asInstanceOf[Project]
-    val resolvedExpr = resolvedPlan.projectList.head
+    val resolvedPlan = ExpressionEvaluator.analyzer.execute(rawPlan)
+    val optimizedPlan = ExpressionEvaluator.optimizerRules.foldLeft(resolvedPlan) {
+      case (plan, rule) => rule.apply(plan)
+    }
+    val resolvedExpr = optimizedPlan.asInstanceOf[Project].projectList.head
     BindReferences.bindReference(resolvedExpr, attributes)
   }
 
@@ -89,13 +94,19 @@ object ExpressionEvaluator {
   // keep our own function registry
   private lazy val functionRegistry = FunctionRegistry.builtin.clone()
 
-  // create a simple catalyst analyzer supporting builtin functions
-  private lazy val analyzer: Analyzer = {
-    val sqlConf = new SQLConf().copy(SQLConf.CASE_SENSITIVE -> true) // resolve identifiers in expressions case-sensitive
+  // create a simple catalyst analyzer and optimizer rule list supporting builtin functions
+  private lazy val (analyzer, optimizerRules): (Analyzer,Seq[Rule[LogicalPlan]]) = {
+    val sqlConf = new SQLConf()
+    sqlConf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
     val simpleCatalog = new SessionCatalog(new InMemoryCatalog, functionRegistry, sqlConf) {
       override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
     }
-    new Analyzer(simpleCatalog, sqlConf)
+    val analyzer = new Analyzer(simpleCatalog, sqlConf) {
+      override def resolver: Resolver = caseSensitiveResolution // resolve identifiers in expressions case-sensitive
+    }
+    // only apply a small selection of optimizer rules needed to evaluate simple expressions.
+    val optimizerRules = Seq(ReplaceExpressions, ComputeCurrentTime)
+    (analyzer, optimizerRules)
   }
 
   /**
