@@ -17,8 +17,12 @@
 
 package org.apache.spark.sql.custom
 
+import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.functions._
 import org.scalatest.funsuite.AnyFunSuite
+
+import java.sql.Timestamp
+import java.time.LocalDate
 
 class ExpressionEvaluatorTest extends AnyFunSuite {
 
@@ -69,6 +73,24 @@ class ExpressionEvaluatorTest extends AnyFunSuite {
     val ex = intercept[IllegalArgumentException](new ExpressionEvaluator[TestObj,Any](expr(expression)))
     assert(ex.getMessage.contains("abc"))
   }
+
+  test("evaluate expression: evaluation is case sensitive") {
+    val expression = "concat(s[0].Y, b)"
+    val ex = intercept[AnalysisException](new ExpressionEvaluator[TestObj,Any](expr(expression)))
+    assert(ex.getMessage.contains("Y"))
+  }
+
+  test("evaluate expression: RuntimeReplaceable expressions are replaced") {
+    // this needs optimizer step
+    // see also https://jaceklaskowski.gitbooks.io/mastering-spark-sql/content/spark-sql-Expression-RuntimeReplaceable.html
+    // and https://jaceklaskowski.gitbooks.io/mastering-spark-sql/content/spark-sql-Optimizer-ReplaceExpressions.html
+    val expression = "to_date('2016-04-08', 'yyyy-MM-dd')"
+    val evaluator = new ExpressionEvaluator[TestObj,Any](expr(expression))
+    val result = evaluator.apply(input)
+    assert(result == Timestamp.valueOf(LocalDate.of(2016,4,8).atStartOfDay()))
+  }
+
+
 }
 
 case class Entry(y: String, z: Int)
