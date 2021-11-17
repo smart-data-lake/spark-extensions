@@ -74,7 +74,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git pull
+        git pull origin ${GITHUB_BASE_REF}
     - name: Git Push Master
       uses: ad-m/github-push-action@master
       with:
@@ -89,37 +89,28 @@ jobs:
         ref: ${{ env.GITHUB_HEAD_REF }}
         fetch-depth: 0
         persist-credentials: false
-    - name: Git Merge to develop
+    - name: Git Merge Master into Develop
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git branch
-        git fetch --all
-        git branch
+        git fetch origin ${GITHUB_HEAD_REF}
         git checkout ${GITHUB_HEAD_REF}
         git merge origin/${GITHUB_BASE_REF}
-        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
-    
-    - name: Develop Git Push Release
-      uses: ad-m/github-push-action@master
-      with:
-        branch: ${{ env.GITHUB_HEAD_REF }}
-        github_token: ${{ secrets.PAT_ACTIONS }}
-    
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
     - name: Develop Get Next Version
       id: bump_version
       uses: christian-draeger/increment-semantic-version@1.0.1
       with:
         current-version: ${{ env.MVN_RELEASE_VERSION }}
         version-fragment: bug
-    - name: Develop Set Next Snapshot version
+    - name: Develop Set Next Snapshot Version
       run: sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
     - name: Develop Git Commit Snapshot
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git commit -m "Increment to next SNAPSHOT release" -a
-    - name: Develop Git Push Snapshot
+    - name: Develop Git Push
       uses: ad-m/github-push-action@master
       with:
         branch: ${{ env.GITHUB_HEAD_REF }}
