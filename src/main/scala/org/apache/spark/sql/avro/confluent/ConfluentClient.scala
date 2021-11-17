@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.avro.confluent
 
+import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, SchemaRegistryClient}
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import org.apache.spark.internal.Logging
@@ -31,6 +32,7 @@ import scala.util.Try
  * Wrapper for schema registry client.
  * It supports advanced logic for schema compatibility check and update.
  * It provides Spark SQL functions from/to_confluent_avro for decoding/encoding confluent avro messages.
+ * TODO: implement JSON and Protobuf support of Confluent
  */
 class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializable {
 
@@ -97,7 +99,12 @@ class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializab
     (schemaId,avroSchema)
   }
 
-  def getSchemaFromConfluent(id:Int): (Int,Schema) = (id,sr.getById(id))
+  def getSchemaFromConfluent(id:Int): (Int,Schema) = {
+    val avroSchema = sr.getSchemaById(id) match {
+      case s: AvroSchema => s.rawSchema()
+    }
+    (id,avroSchema)
+  }
 
   /**
    * Converts a binary column of confluent avro format into its corresponding catalyst value according to the latest
@@ -132,7 +139,8 @@ class ConfluentClient(schemaRegistryUrl: String) extends Logging with Serializab
 
   private def registerSchema(subject:String, schema:Schema): (Int,Schema) = {
     logInfo(s"Register new schema for $subject: schema=$schema")
-    val schemaId = sr.register(subject, schema)
+
+    val schemaId = sr.register(subject, new AvroSchema(schema))
     subjects.add(subject)
     // return
     (schemaId,schema)
