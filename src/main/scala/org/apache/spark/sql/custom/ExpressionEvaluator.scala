@@ -110,10 +110,10 @@ object ExpressionEvaluator {
     udf match {
       case udaf: UserDefinedAggregator[_, _, _] =>
         def builder(children: Seq[Expression]) = udaf.scalaAggregator(children)
-        functionRegistry.createOrReplaceTempFunction(name, builder)
+        functionRegistry.createOrReplaceTempFunction(name, builder, "scala_udf")
       case _ =>
         def builder(children: Seq[Expression]) = udf.apply(children.map(Column.apply) : _*).expr
-        functionRegistry.createOrReplaceTempFunction(name, builder)
+        functionRegistry.createOrReplaceTempFunction(name, builder, "scala_udf")
     }
   }
 

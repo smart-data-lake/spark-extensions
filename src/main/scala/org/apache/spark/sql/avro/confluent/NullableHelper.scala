@@ -31,6 +31,7 @@ case class SetNullable(child: Expression, forcedNullable: Boolean) extends Unary
     val expr = ctx.addReferenceObj("this", this)
     defineCodeGen(ctx, ev, input => s"(${CodeGenerator.boxedType(dataType)})$expr.nullSafeEval($input)")
   }
+  override protected def withNewChildInternal(newChild: Expression): SetNullable = copy(child = newChild)
 }
 
 object NullableHelper {

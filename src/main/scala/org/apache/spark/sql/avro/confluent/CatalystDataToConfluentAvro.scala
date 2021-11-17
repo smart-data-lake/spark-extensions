@@ -77,4 +77,6 @@ case class CatalystDataToConfluentAvro(child: Expression, subject: String, confl
     os.write(confluentHelper.CONFLUENT_MAGIC_BYTE)
     os.write(ByteBuffer.allocate(Integer.BYTES).putInt(id).array())
   }
+
+  override protected def withNewChildInternal(newChild: Expression): CatalystDataToConfluentAvro = copy(child = newChild)
 }
