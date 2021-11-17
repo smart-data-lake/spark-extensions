@@ -16,7 +16,9 @@ jobs:
     - name: Git Checkout
       uses: actions/checkout@v2
       with:
+        fetch-depth: 0
         ref: ${{ env.GITHUB_BASE_REF }}
+        persist-credentials: false
     - name: JDK 8 Set
       uses: actions/setup-java@v1
       with: 
@@ -72,7 +74,7 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git pull origin ${GITHUB_BASE_REF}
+        git pull origin ${GITHUB_BASE_REF} --rebase
     - name: Git Push Master
       uses: ad-m/github-push-action@master
       with:
