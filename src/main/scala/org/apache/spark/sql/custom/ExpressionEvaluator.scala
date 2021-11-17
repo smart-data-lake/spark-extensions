@@ -21,12 +21,15 @@ import org.apache.spark.sql.catalyst.analysis.{Analyzer, FakeV2SessionCatalog, F
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
-import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, Project}
+import org.apache.spark.sql.catalyst.optimizer.{ComputeCurrentTime, GetCurrentDatabaseAndCatalog, ReplaceExpressions, ReplaceUpdateFieldsExpression}
+import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan, Project}
+import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
 import org.apache.spark.sql.expressions.{UserDefinedAggregator, UserDefinedFunction}
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.DataType
 import org.apache.spark.sql.{Column, Encoders}
 
 import scala.reflect.ClassTag
@@ -49,8 +52,11 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
     val attributes = dataEncoder.schema.toAttributes
     val localRelation = LocalRelation(attributes)
     val rawPlan = Project(Seq(exprCol.alias("test").named),localRelation)
-    val resolvedPlan = ExpressionEvaluator.analyzer.execute(rawPlan).asInstanceOf[Project]
-    val resolvedExpr = resolvedPlan.projectList.head
+    val resolvedPlan = ExpressionEvaluator.analyzer.execute(rawPlan)
+    val optimizedPlan = ExpressionEvaluator.optimizerRules.foldLeft(resolvedPlan) {
+      case (plan, rule) => rule.apply(plan)
+    }
+    val resolvedExpr = optimizedPlan.asInstanceOf[Project].projectList.head
     BindReferences.bindReference(resolvedExpr, attributes)
   }
 
@@ -66,7 +72,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
     val encoder = ExpressionEncoder[R]
     val dataType = encoder.schema.head.dataType
     // check if resulting datatype matches
-    require(expr.dataType == dataType, s"expression result data type ${expr.dataType} does not match requested datatype $dataType")
+    require(DataType.equalsStructurally(expr.dataType, dataType, ignoreNullability = true), s"expression result data type ${expr.dataType} does not match requested datatype $dataType")
     val resolvedEncoder = encoder.resolveAndBind(encoder.schema.toAttributes)
     val deserializer = (result: Any) => resolvedEncoder.createDeserializer()(InternalRow(result))
     (dataType, deserializer)
@@ -89,16 +95,20 @@ object ExpressionEvaluator {
   // keep our own function registry
   private lazy val functionRegistry = FunctionRegistry.builtin.clone()
 
-  // create a simple catalyst analyzer supporting builtin functions
-  private lazy val analyzer: Analyzer = {
+  // create a simple catalyst analyzer and optimizer rule list supporting builtin functions
+  private lazy val (analyzer, optimizerRules): (Analyzer,Seq[Rule[LogicalPlan]]) = {
     val sqlConf = new SQLConf()
     sqlConf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
     val simpleCatalog = new SessionCatalog(new InMemoryCatalog, functionRegistry, sqlConf) {
       override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
     }
-    new Analyzer(new CatalogManager(FakeV2SessionCatalog, simpleCatalog)) {
+    val catalogManager = new CatalogManager(FakeV2SessionCatalog, simpleCatalog)
+    val analyzer = new Analyzer(catalogManager) {
       override def resolver: Resolver = caseSensitiveResolution // resolve identifiers in expressions case-sensitive
     }
+    // only apply a small selection of optimizer rules needed to evaluate simple expressions.
+    val optimizerRules = Seq(ReplaceExpressions, ComputeCurrentTime, GetCurrentDatabaseAndCatalog(catalogManager), ReplaceUpdateFieldsExpression)
+    (analyzer, optimizerRules)
   }
 
   /**
