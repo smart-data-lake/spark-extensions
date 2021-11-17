@@ -1,9 +1,9 @@
-name: master release
+name: master* release
 
 on: 
   pull_request:
-    branches: 
-      - master
+    branches:
+      - 'master-spark*'
     types: [closed]
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 0
-        ref: master
+        ref: ${{ env.GITHUB_BASE_REF }}
         persist-credentials: false
     - name: JDK 8 Set
       uses: actions/setup-java@v1
@@ -48,13 +48,15 @@ jobs:
     - name: Maven Set Release Version
       run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
       
-    - name: Maven Deploy to Bintray for Scala 2.11
+    - name: Maven Deploy to Bintray for Scala 2.11, only if on master-spark2* branch
+      if: ${{ startsWith(env.GITHUB_BASE_REF, 'master-spark2') }}
       env:
         BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
       run: |
         mkdir -p ~/.m2
         echo "<settings><servers><server><id>bintray-smart-data-lake-smart-data-lake</id><username>smartdatalake</username><password>${BINTRAY_API_KEY}</password></server></servers></settings>" > ~/.m2/settings.xml
         mvn -B clean scala:doc-jar deploy -f pom.xml
+
     - name: Maven Deploy to Bintray for Scala 2.12
       env:
         BINTRAY_API_KEY: ${{ secrets.BINTRAY_API_KEY }}
@@ -78,6 +80,7 @@ jobs:
     - name: Git Push Master
       uses: ad-m/github-push-action@master
       with:
+        branch: ${{ env.GITHUB_BASE_REF }}
         github_token: ${{ secrets.PAT_ACTIONS }}
         
                   
@@ -85,7 +88,7 @@ jobs:
     - name: Develop Git Checkout
       uses: actions/checkout@v2
       with:
-        ref: develop
+        ref: ${{ env.GITHUB_HEAD_REF }}
         fetch-depth: 0
         persist-credentials: false
     - name: Git Merge to develop
@@ -95,14 +98,14 @@ jobs:
         git branch
         git fetch --all
         git branch
-        git checkout develop
-        git merge origin/master
+        git checkout ${GITHUB_HEAD_REF}
+        git merge origin/${GITHUB_BASE_REF}
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
     
     - name: Develop Git Push Release
       uses: ad-m/github-push-action@master
       with:
-        branch: develop
+        branch: ${{ env.GITHUB_HEAD_REF }}
         github_token: ${{ secrets.PAT_ACTIONS }}
     
     - name: Develop Get Next Version
@@ -121,5 +124,5 @@ jobs:
     - name: Develop Git Push Snapshot
       uses: ad-m/github-push-action@master
       with:
-        branch: develop
+        branch: ${{ env.GITHUB_HEAD_REF }}
         github_token: ${{ secrets.PAT_ACTIONS }}
