@@ -18,12 +18,12 @@
 package org.apache.spark.sql.avro.confluent
 
 import java.nio.ByteBuffer
-
 import org.apache.avro.generic.GenericDatumReader
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory}
-import org.apache.spark.sql.avro.AvroDeserializer
+import org.apache.spark.sql.avro.{AvroDeserializer, CatalystDataToAvro}
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
+import org.apache.spark.sql.internal.SQLConf.LegacyBehaviorPolicy
 import org.apache.spark.sql.types.{AbstractDataType, BinaryType, DataType}
 
 import scala.collection.mutable
@@ -57,7 +57,7 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
     avroBinaryDecoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, avroBinaryDecoder)
     val avroReader = avroReaders.getOrElseUpdate(schemaId, new GenericDatumReader[Any](msgSchema))
     avroGenericMsg = avroReader.read(avroGenericMsg, avroBinaryDecoder)
-    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElseUpdate(schemaId, new AvroDeserializer(msgSchema, dataType))
+    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElseUpdate(schemaId, new AvroDeserializer(msgSchema, dataType, LegacyBehaviorPolicy.CORRECTED.toString))
     avro2SparkDeserializer.deserialize(avroGenericMsg).orNull
   }
 
@@ -78,4 +78,6 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
     //return
     (schemaId, avroMsg)
   }
+
+  override protected def withNewChildInternal(newChild: Expression): ConfluentAvroDataToCatalyst = copy(child = newChild)
 }
