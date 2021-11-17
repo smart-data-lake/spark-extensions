@@ -21,7 +21,7 @@ import org.apache.spark.sql.catalyst.analysis.{Analyzer, FakeV2SessionCatalog, F
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
-import org.apache.spark.sql.catalyst.optimizer.{ComputeCurrentTime, GetCurrentDatabaseAndCatalog, ReplaceExpressions, ReplaceUpdateFieldsExpression}
+import org.apache.spark.sql.catalyst.optimizer.{ComputeCurrentTime, ReplaceCurrentLike, ReplaceExpressions, ReplaceUpdateFieldsExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
@@ -107,7 +107,7 @@ object ExpressionEvaluator {
       override def resolver: Resolver = caseSensitiveResolution // resolve identifiers in expressions case-sensitive
     }
     // only apply a small selection of optimizer rules needed to evaluate simple expressions.
-    val optimizerRules = Seq(ReplaceExpressions, ComputeCurrentTime, GetCurrentDatabaseAndCatalog(catalogManager), ReplaceUpdateFieldsExpression)
+    val optimizerRules = Seq(ReplaceExpressions, ComputeCurrentTime, ReplaceCurrentLike(catalogManager), ReplaceUpdateFieldsExpression)
     (analyzer, optimizerRules)
   }
 
