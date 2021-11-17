@@ -15,10 +15,6 @@ jobs:
     steps:
     - name: Git Checkout
       uses: actions/checkout@v2
-      with:
-        fetch-depth: 0
-        ref: ${{ env.GITHUB_BASE_REF }}
-        persist-credentials: false
     - name: JDK 8 Set
       uses: actions/setup-java@v1
       with: 
