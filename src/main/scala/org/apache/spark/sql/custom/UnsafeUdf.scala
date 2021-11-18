@@ -38,8 +38,6 @@ case class UnsafeUnaryUdfExpression(child: Expression, udf: Any => Any, tgtDataT
     val expr = ctx.addReferenceObj("this", this)
     defineCodeGen(ctx, ev, input => s"(${CodeGenerator.boxedType(dataType)})$expr.nullSafeEval($input)")
   }
-  override protected def withNewChildInternal(newChild: Expression): UnsafeUnaryUdfExpression =
-    copy(child = newChild)
 }
 
 
