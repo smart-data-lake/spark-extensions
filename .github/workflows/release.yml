@@ -1,9 +1,9 @@
-name: master release
+name: Release Build
 
 on: 
   pull_request:
-    branches: 
-      - master
+    branches:
+      - 'master-spark*'
     types: [closed]
 
 jobs:
@@ -16,9 +16,13 @@ jobs:
     - name: Git Checkout
       uses: actions/checkout@v2
       with:
+        ref: ${{ github.base_ref }}
         fetch-depth: 0
-        ref: master
-        persist-credentials: false
+        token: ${{ secrets.PAT_ACTIONS }}
+    - name: Git Config
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
     - name: JDK 8 Set
       uses: actions/setup-java@v1
       with: 
@@ -42,7 +46,8 @@ jobs:
     - name: Maven Set Release Version
       run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
 
-    - name: Maven deploy to sonatype for Scala 2.11
+    - name: Maven deploy to sonatype for Scala 2.11, only if on master-spark2* branch
+      if: ${{ startsWith(env.GITHUB_BASE_REF, 'master-spark2') }}
       uses: samuelmeuli/action-maven-publish@v1
       with:
         gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -64,62 +69,35 @@ jobs:
 
     - name: Git Commit and Tag Release
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
         git add -A
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
-    - name: Git Pull Master
+    - name: Git Pull and Push
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git pull
-    - name: Git Push Master
-      uses: ad-m/github-push-action@master
-      with:
-        branch: master
-        github_token: ${{ secrets.PAT_ACTIONS }}
-        
+        git pull --rebase
+        git push
+
                   
     # DEVELOP BRANCH
     - name: Develop Git Checkout
-      uses: actions/checkout@v2
-      with:
-        ref: develop
-        fetch-depth: 0
-        persist-credentials: false
-    - name: Git Merge to develop
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git branch
-        git fetch --all
-        git branch
-        git checkout develop
-        git merge origin/master
-        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
-    
-    - name: Develop Git Push Release
-      uses: ad-m/github-push-action@master
-      with:
-        branch: develop
-        github_token: ${{ secrets.PAT_ACTIONS }}
-    
+        git fetch origin ${GITHUB_HEAD_REF}
+        git checkout ${GITHUB_HEAD_REF}
+    - name: Git Merge Master into Develop
+      run: |
+        git merge origin/${GITHUB_BASE_REF}
+        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
     - name: Develop Get Next Version
       id: bump_version
       uses: christian-draeger/increment-semantic-version@1.0.1
       with:
         current-version: ${{ env.MVN_RELEASE_VERSION }}
         version-fragment: bug
-    - name: Develop Set Next Snapshot version
+    - name: Develop Set Next Snapshot Version
       run: sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
-    - name: Develop Git Commit Snapshot
+    - name: Develop Git Commit
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
         git commit -m "Increment to next SNAPSHOT release" -a
-    - name: Develop Git Push Snapshot
-      uses: ad-m/github-push-action@master
-      with:
-        branch: develop
-        github_token: ${{ secrets.PAT_ACTIONS }}
+    - name: Develop Git Push
+      run: |
+        git push
