@@ -16,6 +16,7 @@ jobs:
     - name: Git Checkout
       uses: actions/checkout@v2
       with:
+        ref: ${{ github.base_ref }}
         fetch-depth: 0
         persist-credentials: false
         token: ${{ secrets.PAT_ACTIONS }}
