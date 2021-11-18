@@ -151,14 +151,6 @@
 		<scalatest.version>3.2.2</scalatest.version>
 	</properties>
 
-	<distributionManagement>
-		<repository>
-			<id>bintray-smart-data-lake-smart-data-lake</id>
-			<name>smart-data-lake-smart-data-lake</name>
-			<url>https://api.bintray.com/maven/smart-data-lake/smart-data-lake/spark-extensions/;publish=1</url>
-		</repository>
-	</distributionManagement>
-
 	<scm>
 		<connection>scm:git:git://github.com/smart-data-lake/spark-extensions.git</connection>
 		<developerConnection>scm:git:ssh://github.com/smart-data-lake/spark-extensions.git</developerConnection>
