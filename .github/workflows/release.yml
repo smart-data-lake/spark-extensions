@@ -17,8 +17,12 @@ jobs:
       uses: actions/checkout@v2
       with:
         fetch-depth: 0
-        ref: ${{ env.GITHUB_BASE_REF }}
         persist-credentials: false
+        token: ${{ secrets.PAT_ACTIONS }}
+    - name: Git Config
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
     - name: JDK 8 Set
       uses: actions/setup-java@v1
       with: 
@@ -65,36 +69,22 @@ jobs:
 
     - name: Git Commit and Tag Release
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
         git add -A
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
-    - name: Git Pull Master
+    - name: Git Pull and Push
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git pull origin ${GITHUB_BASE_REF} --rebase
-    - name: Git Push Master
-      uses: ad-m/github-push-action@master
-      with:
-        branch: ${{ env.GITHUB_BASE_REF }}
-        github_token: ${{ secrets.PAT_ACTIONS }}
-        
+        git pull --rebase
+        git push
+
                   
     # DEVELOP BRANCH
     - name: Develop Git Checkout
-      uses: actions/checkout@v2
-      with:
-        ref: ${{ env.GITHUB_HEAD_REF }}
-        fetch-depth: 0
-        persist-credentials: false
-    - name: Git Merge Master into Develop
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
         git fetch origin ${GITHUB_HEAD_REF}
         git checkout ${GITHUB_HEAD_REF}
+    - name: Git Merge Master into Develop
+      run: |
         git merge origin/${GITHUB_BASE_REF}
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
     - name: Develop Get Next Version
@@ -105,13 +95,9 @@ jobs:
         version-fragment: bug
     - name: Develop Set Next Snapshot Version
       run: sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
-    - name: Develop Git Commit Snapshot
+    - name: Develop Git Commit
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
         git commit -m "Increment to next SNAPSHOT release" -a
     - name: Develop Git Push
-      uses: ad-m/github-push-action@master
-      with:
-        branch: ${{ env.GITHUB_HEAD_REF }}
-        github_token: ${{ secrets.PAT_ACTIONS }}
+      run: |
+        git push
