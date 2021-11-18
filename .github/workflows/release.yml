@@ -47,7 +47,7 @@ jobs:
       run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
 
     - name: Maven deploy to sonatype for Scala 2.11, only if on master-spark2* branch
-      if: ${{ startsWith(env.GITHUB_BASE_REF, 'master-spark2') }}
+      if: ${{ contains(github.base_ref, 'master-spark2') }}
       uses: samuelmeuli/action-maven-publish@v1
       with:
         gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
