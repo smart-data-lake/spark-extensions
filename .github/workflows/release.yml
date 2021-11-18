@@ -20,9 +20,10 @@ jobs:
         persist-credentials: false
         token: ${{ secrets.PAT_ACTIONS }}
     - name: Git Config
+      uses: actions/checkout@v2
       run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
+        git config user.email "action@github.com"
+        git config user.name "GitHub Action"
     - name: JDK 8 Set
       uses: actions/setup-java@v1
       with: 
@@ -68,11 +69,13 @@ jobs:
         maven_args: -B -f pom.xml
 
     - name: Git Commit and Tag Release
+      uses: actions/checkout@v2
       run: |
         git add -A
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to committ
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
     - name: Git Pull and Push
+      uses: actions/checkout@v2
       run: |
         git pull --rebase
         git push
@@ -80,10 +83,12 @@ jobs:
                   
     # DEVELOP BRANCH
     - name: Develop Git Checkout
+      uses: actions/checkout@v2
       run: |
         git fetch origin ${GITHUB_HEAD_REF}
         git checkout ${GITHUB_HEAD_REF}
     - name: Git Merge Master into Develop
+      uses: actions/checkout@v2
       run: |
         git merge origin/${GITHUB_BASE_REF}
         git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
@@ -96,8 +101,10 @@ jobs:
     - name: Develop Set Next Snapshot Version
       run: sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
     - name: Develop Git Commit
+      uses: actions/checkout@v2
       run: |
         git commit -m "Increment to next SNAPSHOT release" -a
     - name: Develop Git Push
+      uses: actions/checkout@v2
       run: |
         git push
