@@ -1,4 +1,4 @@
-name: master* release
+name: Release Build
 
 on: 
   pull_request:
@@ -100,6 +100,4 @@ jobs:
         git commit -m "Increment to next SNAPSHOT release" -a
     - name: Develop Git Push
       run: |
-        git config user.name github-actions
-        git config user.email github-actions@github.com
         git push
