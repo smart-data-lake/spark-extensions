@@ -82,6 +82,7 @@ object XsdSchemaConverter {
     new XsdSchemaConverter(xmlSchema, maxRecursion).getStructType
   }
 }
+
 class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
   private def getStructField(schemaType: XmlSchemaType, path: Seq[String]): Option[StructField] = {
     schemaType match {
@@ -258,7 +259,7 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
     }
   }
 
-  private def getStructType: StructType = {
+  def getStructType: StructType = {
     StructType(xmlSchema.getElements.asScala.toSeq.map { case (_, schemaElement) =>
       val schemaType = schemaElement.getSchemaType
       // if (schemaType.isAnonymous) {
@@ -268,7 +269,6 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
       StructField(schemaElement.getName, rootType.dataType, schemaElement.getMinOccurs == 0)
     })
   }
-
 }
 
 private[xml] object XmlOptions {
