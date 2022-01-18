@@ -21,6 +21,7 @@ import org.apache.avro.LogicalTypes.{Date, Decimal, TimestampMicros, TimestampMi
 import org.apache.avro.Schema.Type._
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.apache.spark.sql.catalyst.util.RandomUUIDGenerator
+import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.types.Decimal.minBytesForPrecision
 import org.apache.spark.sql.types._
 
@@ -193,5 +194,3 @@ object AvroSchemaConverter {
     }
   }
 }
-
-class IncompatibleSchemaException(msg: String, ex: Throwable = null) extends Exception(msg, ex)

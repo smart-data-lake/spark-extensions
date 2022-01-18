@@ -27,6 +27,7 @@ import org.apache.avro.{LogicalTypes, Schema}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{SpecializedGetters, SpecificInternalRow}
+import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.types._
 
 import java.nio.ByteBuffer
@@ -123,7 +124,7 @@ class MyAvroSerializer(rootCatalystType: DataType, rootAvroType: Schema, nullabl
         (getter, ordinal) => new Utf8(getter.getUTF8String(ordinal).getBytes)
 
       case (BinaryType, FIXED) =>
-        val size = avroType.getFixedSize()
+        val size = avroType.getFixedSize
         (getter, ordinal) =>
           val data: Array[Byte] = getter.getBinary(ordinal)
           if (data.length != size) {
@@ -147,7 +148,7 @@ class MyAvroSerializer(rootCatalystType: DataType, rootAvroType: Schema, nullabl
         // output the timestamp value as with millisecond precision.
         case null => (getter, ordinal) => getter.getLong(ordinal) / 1000
         case other => throw new IncompatibleSchemaException(
-          s"Cannot convert Catalyst Timestamp type to Avro logical type ${other}")
+          s"Cannot convert Catalyst Timestamp type to Avro logical type $other")
       }
 
       case (ArrayType(et, containsNull), ARRAY) =>

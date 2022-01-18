@@ -17,8 +17,10 @@
 
 package org.apache.spark.sql.confluent
 
-import io.confluent.kafka.schemaregistry.ParsedSchema
+import io.confluent.kafka.schemaregistry.{ParsedSchema, SchemaProvider}
+import io.confluent.kafka.schemaregistry.avro.AvroSchemaProvider
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, SchemaRegistryClient}
+import io.confluent.kafka.schemaregistry.json.JsonSchemaProvider
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
@@ -34,7 +36,7 @@ import scala.collection.mutable
  */
 class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logging with Serializable {
 
-  @transient lazy val sr: SchemaRegistryClient = new CachedSchemaRegistryClient(schemaRegistryUrl, 1000)
+  @transient lazy val sr: SchemaRegistryClient = new CachedSchemaRegistryClient(Seq(schemaRegistryUrl).asJava, 1000, Seq[SchemaProvider](new AvroSchemaProvider, new JsonSchemaProvider).asJava, null)
   @transient private lazy val subjects = mutable.Set(sr.getAllSubjects.asScala.toSeq: _*)
   logInfo(s"Initialize confluent schema registry with url $schemaRegistryUrl")
 
@@ -42,8 +44,8 @@ class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logg
    * get the subject name for a topic (confluent standard is postfixing '-key' or '-value')
    */
   def getSubject(topic: String, subjectType: SubjectType): String = subjectType match {
-    case SubjectType.key => s"${topic}-key"
-    case SubjectType.value => s"${topic}-value"
+    case SubjectType.key => s"$topic-key"
+    case SubjectType.value => s"$topic-value"
   }
 
   /**
@@ -63,13 +65,14 @@ class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logg
     if (!latestSchema._2.equals(newSchema)) {
       val checkSchemaFunc = if (mutualReadCheck) checkSchemaMutualReadable _ else checkSchemaCanRead _
       val compatibilityViolations = checkSchemaFunc(latestSchema._2, newSchema)
+      val modeForLogging = if (mutualReadCheck) "forward & backward" else "backward"
       if (compatibilityViolations.isEmpty) {
-        logInfo(s"New schema for subject $subject is compatible with latest schema (mutualRead=$mutualReadCheck): new=$newSchema")
+        logInfo(s"New schema for subject $subject is $modeForLogging compatible with latest schema: new=$newSchema")
         registerSchema(subject, newSchema)
       } else {
-        val msg = s"New schema for subject $subject is not compatible with latest schema (mutualRead=$mutualReadCheck)"
+        val msg = s"New schema for subject $subject is not $modeForLogging compatible with latest schema"
         logError(s"$msg: latest=${latestSchema._2} new=$newSchema violations=${compatibilityViolations.mkString(";")}")
-        throw new SchemaIncompatibleException(msg)
+        throw new IncompatibleSchemaException(msg)
       }
     } else {
       logDebug(s"New schema for $subject is equal to latest schema")
@@ -97,7 +100,6 @@ class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logg
     val avroSchema = sr.getSchemaById(id).asInstanceOf[S]
     (id, avroSchema)
   }
-
 
   private def registerSchema(subject: String, schema: S): (Int, S) = {
     logInfo(s"Register new schema for $subject: schema=$schema")
@@ -160,6 +162,4 @@ object SubjectType extends Enumeration {
   val key, value = Value
 }
 
-class SubjectNotExistingException(msg:String) extends Exception(msg)
-
-class SchemaIncompatibleException(msg:String) extends Exception(msg)
+class IncompatibleSchemaException(msg: String, ex: Throwable = null) extends Exception(msg, ex)
