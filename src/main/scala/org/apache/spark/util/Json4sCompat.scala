@@ -1,6 +1,8 @@
 package org.apache.spark.util
 
-import org.json4s.{CustomSerializer, Formats, JValue}
+import org.json4s.jackson.Serialization
+import org.json4s.{CustomSerializer, Formats, JValue, ShortTypeHints}
+
 import scala.reflect.ClassTag
 
 /**
@@ -15,4 +17,12 @@ object Json4sCompat {
   def getCustomSerializer[A: ClassTag: Manifest](ser: Formats => (PartialFunction[JValue, A], PartialFunction[Any, JValue])): CustomSerializer[A] = {
     new CustomSerializer[A](ser)
   }
+
+  /**
+   * Json4s formats.withStrictMapExtraction does not yet exists in 3.7-M5
+   */
+  def getStrictSerializationFormat(typeHints: ShortTypeHints): Formats = {
+    Serialization.formats(typeHints).withStrictArrayExtraction.withStrictMapExtraction.withStrictOptionParsing
+  }
+
 }
