@@ -30,6 +30,6 @@ object Json4sCompat {
    * Json4s formats.withStrictMapExtraction does not yet exists in 3.7-M5
    */
   def getStrictSerializationFormat(typeHints: ShortTypeHints): Formats = {
-    Serialization.formats(typeHints).withStrictArrayExtraction.withStrictOptionParsing
+    Serialization.formats(typeHints).withStrictArrayExtraction
   }
 }
