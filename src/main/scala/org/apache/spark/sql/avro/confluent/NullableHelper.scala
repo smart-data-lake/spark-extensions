@@ -18,26 +18,36 @@
 package org.apache.spark.sql.avro.confluent
 
 import org.apache.spark.sql.Column
-import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode, FalseLiteral}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnaryExpression}
 import org.apache.spark.sql.types.DataType
 
 case class SetNullable(child: Expression, forcedNullable: Boolean) extends UnaryExpression {
   override def dataType: DataType = child.dataType
   override def nullable: Boolean = forcedNullable // override nullable
-  override def nullSafeEval(input: Any): Any = input
   override def prettyName: String = "set_nullable"
-  override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = {
-    val expr = ctx.addReferenceObj("this", this)
-    defineCodeGen(ctx, ev, input => s"(${CodeGenerator.boxedType(dataType)})$expr.nullSafeEval($input)")
+  override def eval(input: InternalRow): Any = {
+    val value = child.eval(input)
+    if (!forcedNullable && value == null) throw new IllegalStateException(s"makeNotNullable used on column that has null values. To fix this you could use coalesce and set a default value.")
+    value
   }
+  override protected def doGenCode(ctx: CodegenContext, ev: ExprCode): ExprCode = child.genCode(ctx)
   override protected def withNewChildInternal(newChild: Expression): SetNullable = copy(child = newChild)
 }
 
 object NullableHelper {
+  /**
+   * Modifies the nullability property of a column to be not nullable.
+   * If the column contains null values at runtime, execution will stop with IllegalStateException.
+   * Often it's better to use coalesce to modify schema of a column to be not nullable, and set a default value for values that are null.
+   */
   def makeNotNullable(data: Column): Column = {
     new Column(SetNullable(data.expr, false))
   }
+  /**
+   * Modifies the nullability property of a column to be nullable.
+   */
   def makeNullable(data: Column): Column = {
     new Column(SetNullable(data.expr, true))
   }

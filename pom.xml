@@ -19,7 +19,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>spark-extensions_${scala.minor.version}</artifactId>
-	<version>3.2.0</version>
+	<version>3.2.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<licenses>
@@ -150,14 +150,6 @@
 
 		<scalatest.version>3.2.2</scalatest.version>
 	</properties>
-
-	<distributionManagement>
-		<repository>
-			<id>bintray-smart-data-lake-smart-data-lake</id>
-			<name>smart-data-lake-smart-data-lake</name>
-			<url>https://api.bintray.com/maven/smart-data-lake/smart-data-lake/spark-extensions/;publish=1</url>
-		</repository>
-	</distributionManagement>
 
 	<scm>
 		<connection>scm:git:git://github.com/smart-data-lake/spark-extensions.git</connection>
