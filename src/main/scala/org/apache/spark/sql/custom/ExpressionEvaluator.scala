@@ -17,8 +17,9 @@
 
 package org.apache.spark.sql.custom
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.{Analyzer, FakeV2SessionCatalog, FunctionRegistry, Resolver, UnresolvedAttribute, caseSensitiveResolution}
-import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, InMemoryCatalog, SessionCatalog}
+import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, ExternalCatalog, InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
 import org.apache.spark.sql.catalyst.optimizer.{ComputeCurrentTime, GetCurrentDatabaseAndCatalog, ReplaceExpressions, ReplaceUpdateFieldsExpression}
@@ -34,6 +35,7 @@ import org.apache.spark.sql.{Column, Encoders}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
+import scala.util.Try
 
 /**
  * ExpressionEvaluator can evaluate a Spark SQL expression against a case class
@@ -90,18 +92,30 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
   }
 }
 
-object ExpressionEvaluator {
+object ExpressionEvaluator extends Logging {
 
   // keep our own function registry
   private lazy val functionRegistry = FunctionRegistry.builtin.clone()
 
   // create a simple catalyst analyzer and optimizer rule list supporting builtin functions
-  private lazy val (analyzer, optimizerRules): (Analyzer,Seq[Rule[LogicalPlan]]) = {
+  private lazy val (analyzer, optimizerRules): (Analyzer, Seq[Rule[LogicalPlan]]) = {
     val sqlConf = new SQLConf()
     sqlConf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
-    val simpleCatalog = new SessionCatalog(new InMemoryCatalog, functionRegistry, sqlConf) {
-      override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
-    }
+    val externalCatalog = new InMemoryCatalog
+    // Databricks has a modified Spark 3.1/3.2 Version, we try to create both while catching exception to report them later.
+    val originalSimpleCatalog = Try(
+      new SessionCatalog(externalCatalog, functionRegistry, sqlConf) {
+        override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
+      }
+    )
+    val databricksSimpleCatalog = Try(createDatabricksSessionCatalog(externalCatalog, sqlConf))
+    val simpleCatalog = originalSimpleCatalog
+      .orElse(databricksSimpleCatalog)
+      .getOrElse{
+        logError("Exception for Spark original API", originalSimpleCatalog.failed.get)
+        logError("Exception for Databricks modified API", originalSimpleCatalog.failed.get)
+        throw new RuntimeException("Could not create SessionCatalog")
+      }
     val catalogManager = new CatalogManager(FakeV2SessionCatalog, simpleCatalog)
     val analyzer = new Analyzer(catalogManager) {
       override def resolver: Resolver = caseSensitiveResolution // resolve identifiers in expressions case-sensitive
@@ -109,6 +123,17 @@ object ExpressionEvaluator {
     // only apply a small selection of optimizer rules needed to evaluate simple expressions.
     val optimizerRules = Seq(ReplaceExpressions, ComputeCurrentTime, GetCurrentDatabaseAndCatalog(catalogManager), ReplaceUpdateFieldsExpression)
     (analyzer, optimizerRules)
+  }
+
+  /**
+   * Databricks has a modified Spark Version.
+   * To create a SessionCatalog, an instance of the Databricks specific SessionCatalogImpl must be created dynamically.
+   */
+  private def createDatabricksSessionCatalog(catalog: ExternalCatalog, sqlConf: SQLConf): SessionCatalog = {
+    val clazz = this.getClass.getClassLoader.loadClass("org.apache.spark.sql.catalyst.catalog.SessionCatalogImpl")
+    val constructor = clazz.getConstructors
+      .find(_.getParameterTypes.toSeq == Seq(classOf[ExternalCatalog], classOf[FunctionRegistry], classOf[SQLConf]))
+    constructor.get.newInstance(catalog, functionRegistry, sqlConf).asInstanceOf[SessionCatalog]
   }
 
   /**
