@@ -102,21 +102,28 @@ object ExpressionEvaluator extends Logging {
     val sqlConf = new SQLConf()
     sqlConf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
     val externalCatalog = new InMemoryCatalog
-    // Databricks has a modified Spark 3.1/3.2 Version, we try to create both while catching exception to report them later.
-    val originalSimpleCatalog = Try(
-      new SessionCatalog(externalCatalog, functionRegistry, sqlConf) {
+    // Databricks has a modified Spark 3.1/3.2 Version, we try to create original catalog manager and the databricks version while catching exception to report them later.
+    val originalCatalogManager = try {
+      val simpleCatalog = new SessionCatalog(externalCatalog, functionRegistry, sqlConf) {
         override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
       }
-    )
-    val databricksSimpleCatalog = Try(createDatabricksSessionCatalog(externalCatalog, sqlConf))
-    val simpleCatalog = originalSimpleCatalog
-      .orElse(databricksSimpleCatalog)
+      Right(new CatalogManager(FakeV2SessionCatalog, simpleCatalog))
+    } catch {
+      // NoSuchMethodError extends Throwable directly, which is not caught by Try...
+      case t: Throwable => Left(t)
+    }
+    val databricksCatalogManager = try {
+      Right(createDatabricksCatalogManager(externalCatalog, sqlConf))
+    } catch {
+      case t: Throwable => Left(t)
+    }
+    val catalogManager = originalCatalogManager.toTry
+      .orElse(databricksCatalogManager.toTry)
       .getOrElse{
-        logError("Exception for Spark original API", originalSimpleCatalog.failed.get)
-        logError("Exception for Databricks modified API", originalSimpleCatalog.failed.get)
+        logError("Exception for Spark original API", originalCatalogManager.left.get)
+        logError("Exception for Databricks modified API", databricksCatalogManager.left.get)
         throw new RuntimeException("Could not create SessionCatalog")
       }
-    val catalogManager = new CatalogManager(FakeV2SessionCatalog, simpleCatalog)
     val analyzer = new Analyzer(catalogManager) {
       override def resolver: Resolver = caseSensitiveResolution // resolve identifiers in expressions case-sensitive
     }
@@ -126,14 +133,20 @@ object ExpressionEvaluator extends Logging {
   }
 
   /**
-   * Databricks has a modified Spark Version.
-   * To create a SessionCatalog, an instance of the Databricks specific SessionCatalogImpl must be created dynamically.
+   * Databricks has a modified Spark Version, because of integration of their Unity-catalog.
+   * To create a CatalogManager, an instance of the Databricks specific SessionCatalogImpl must be created dynamically.
    */
-  private def createDatabricksSessionCatalog(catalog: ExternalCatalog, sqlConf: SQLConf): SessionCatalog = {
-    val clazz = this.getClass.getClassLoader.loadClass("org.apache.spark.sql.catalyst.catalog.SessionCatalogImpl")
-    val constructor = clazz.getConstructors
+  private def createDatabricksCatalogManager(catalog: ExternalCatalog, sqlConf: SQLConf): CatalogManager = {
+    val clazzSessionCatalog = this.getClass.getClassLoader.loadClass("org.apache.spark.sql.catalyst.catalog.SessionCatalogImpl")
+    val constructorSessionCatalog = clazzSessionCatalog.getConstructors
       .find(_.getParameterTypes.toSeq == Seq(classOf[ExternalCatalog], classOf[FunctionRegistry], classOf[SQLConf]))
-    constructor.get.newInstance(catalog, functionRegistry, sqlConf).asInstanceOf[SessionCatalog]
+      .get
+    val simpleCatalog = constructorSessionCatalog.newInstance(catalog, functionRegistry, sqlConf).asInstanceOf[SessionCatalog]
+    val clazzCatalogManager = this.getClass.getClassLoader.loadClass("org.apache.spark.sql.connector.catalog.CatalogManager")
+    val constructorCatalogManager = clazzCatalogManager.getConstructors.head
+    val catalogManager = constructorCatalogManager.newInstance(FakeV2SessionCatalog, simpleCatalog, Boolean.box(false) /* unityCatalogEnv */).asInstanceOf[CatalogManager]
+    //return
+    catalogManager
   }
 
   /**
