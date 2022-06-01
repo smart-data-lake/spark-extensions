@@ -27,10 +27,10 @@ import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan, 
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.connector.catalog.CatalogManager
-import org.apache.spark.sql.custom.ExpressionEvaluator.findUnresolvedAttributes
+import org.apache.spark.sql.custom.ExpressionEvaluator.{findUnresolvedAttributes, resolveExpression}
 import org.apache.spark.sql.expressions.{UserDefinedAggregator, UserDefinedFunction}
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{Column, Encoders}
 
 import scala.reflect.ClassTag
@@ -50,17 +50,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
   // prepare evaluator (this is Spark internal API)
   private val dataEncoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
   private val dataSerializer = dataEncoder.createSerializer
-  private val expr = {
-    val attributes = dataEncoder.schema.toAttributes
-    val localRelation = LocalRelation(attributes)
-    val rawPlan = Project(Seq(exprCol.alias("test").named),localRelation)
-    val resolvedPlan = ExpressionEvaluator.analyzer.execute(rawPlan)
-    val optimizedPlan = ExpressionEvaluator.optimizerRules.foldLeft(resolvedPlan) {
-      case (plan, rule) => rule.apply(plan)
-    }
-    val resolvedExpr = optimizedPlan.asInstanceOf[Project].projectList.head
-    BindReferences.bindReference(resolvedExpr, attributes)
-  }
+  private val expr = resolveExpression(exprCol, dataEncoder.schema)
 
   // check if expression is fully resolved
   require(expr.resolved, {
@@ -165,7 +155,28 @@ object ExpressionEvaluator extends Logging {
     }
   }
 
-  private def findUnresolvedAttributes(expr: Expression): Seq[UnresolvedAttribute] = {
+  /**
+   * Resolve an expression against a given schema.
+   * A resolved expression has a dataType and can be evaluated against data.
+   */
+  def resolveExpression(exprCol: Column, schema: StructType, caseSensitive: Boolean = true): Expression = {
+    val schemaPrep = if (caseSensitive) schema
+    else StructType(schema.map(f => f.copy(name = f.name.toLowerCase)))
+    val attributes = schemaPrep.toAttributes
+    val localRelation = LocalRelation(attributes)
+    val rawPlan = Project(Seq(exprCol.alias("test").named),localRelation)
+    val resolvedPlan = analyzer.execute(rawPlan)
+    val optimizedPlan = optimizerRules.foldLeft(resolvedPlan) {
+      case (plan, rule) => rule.apply(plan)
+    }
+    val resolvedExpr = optimizedPlan.asInstanceOf[Project].projectList.head
+    BindReferences.bindReference(resolvedExpr, attributes)
+  }
+
+  /**
+   * Search for unresolved attributes in an expression to create meaningful error messages.
+   */
+  def findUnresolvedAttributes(expr: Expression): Seq[UnresolvedAttribute] = {
     if (expr.resolved) Seq()
     else expr match {
       case attr: UnresolvedAttribute => Seq(attr)
