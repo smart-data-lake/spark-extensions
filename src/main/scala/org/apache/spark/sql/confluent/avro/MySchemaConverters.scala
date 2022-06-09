@@ -15,18 +15,17 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.avro.confluent
+package org.apache.spark.sql.confluent.avro
+
+import org.apache.avro.LogicalTypes.{Date, Decimal, TimestampMicros, TimestampMillis}
+import org.apache.avro.Schema.Type._
+import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
+import org.apache.spark.sql.catalyst.util.RandomUUIDGenerator
+import org.apache.spark.sql.types.Decimal.minBytesForPrecision
+import org.apache.spark.sql.types._
 
 import scala.collection.JavaConverters._
 import scala.util.Random
-
-import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
-import org.apache.avro.LogicalTypes.{Date, Decimal, TimestampMicros, TimestampMillis}
-import org.apache.avro.Schema.Type._
-
-import org.apache.spark.sql.catalyst.util.RandomUUIDGenerator
-import org.apache.spark.sql.types._
-import org.apache.spark.sql.types.Decimal.{maxPrecisionForBytes, minBytesForPrecision}
 
 /**
  * This object contains method that are used to convert sparkSQL schemas to avro schemas and vice

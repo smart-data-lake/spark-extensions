@@ -1,0 +1,16 @@
+{
+  "$schema": "mapTestSchema",
+  "type": "object",
+  "properties": {
+    "strictMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "number"
+      }
+    },
+    "nonStrictMap": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

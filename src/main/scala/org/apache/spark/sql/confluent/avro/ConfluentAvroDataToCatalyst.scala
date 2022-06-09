@@ -1,43 +1,28 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
+package org.apache.spark.sql.confluent.avro
 
-package org.apache.spark.sql.avro.confluent
-
-import java.nio.ByteBuffer
-
+import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import org.apache.avro.generic.GenericDatumReader
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory}
 import org.apache.spark.sql.avro.AvroDeserializer
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, UnaryExpression}
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
+import org.apache.spark.sql.confluent.ConfluentClient
+import org.apache.spark.sql.internal.SQLConf.LegacyBehaviorPolicy
 import org.apache.spark.sql.types.{AbstractDataType, BinaryType, DataType}
 
+import java.nio.ByteBuffer
 import scala.collection.mutable
 
 // copied from org.apache.spark.sql.avro.*
-case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confluentHelper: ConfluentClient)
+case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confluentHelper: ConfluentClient[AvroSchema])
   extends UnaryExpression with ExpectsInputTypes {
 
   override def inputTypes: Seq[AbstractDataType] = Seq(BinaryType)
 
   override lazy val dataType: DataType = {
-    // Avro schema is not serializable. We must be careful to not store it in an attribute of the class.
+    // Avro schema is not serializable in older versions. We must be careful to not store it in an attribute of the class.
     val (schemaId, schema) = confluentHelper.getLatestSchemaFromConfluent(subject)
-    MySchemaConverters.toSqlType(schema).dataType
+    MySchemaConverters.toSqlType(schema.rawSchema).dataType
   }
 
   override def nullable: Boolean = true
@@ -52,12 +37,12 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
 
   override def nullSafeEval(input: Any): Any = {
     val binary = input.asInstanceOf[Array[Byte]]
-    val (schemaId,avroMsg) = parseConfluentMsg(binary)
-    val (_,msgSchema) = confluentHelper.getSchemaFromConfluent(schemaId)
+    val (schemaId, avroMsg) = parseConfluentMsg(binary)
+    val (_, msgSchema) = confluentHelper.getSchemaFromConfluent(schemaId)
     avroBinaryDecoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, avroBinaryDecoder)
-    val avroReader = avroReaders.getOrElseUpdate(schemaId, new GenericDatumReader[Any](msgSchema))
+    val avroReader = avroReaders.getOrElseUpdate(schemaId, new GenericDatumReader[Any](msgSchema.rawSchema))
     avroGenericMsg = avroReader.read(avroGenericMsg, avroBinaryDecoder)
-    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElseUpdate(schemaId, new AvroDeserializer(msgSchema, dataType))
+    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElseUpdate(schemaId, new AvroDeserializer(msgSchema.rawSchema, dataType))
     avro2SparkDeserializer.deserialize(avroGenericMsg).orNull
   }
 
@@ -69,10 +54,10 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
       s"(${CodeGenerator.boxedType(dataType)})$expr.nullSafeEval($input)")
   }
 
-  def parseConfluentMsg(msg:Array[Byte]): (Int,Array[Byte]) = {
+  def parseConfluentMsg(msg: Array[Byte]): (Int, Array[Byte]) = {
     val msgBuffer = ByteBuffer.wrap(msg)
     val magicByte = msgBuffer.get
-    require(magicByte == confluentHelper.CONFLUENT_MAGIC_BYTE, "Magic byte not present at start of confluent message!")
+    require(magicByte == ConfluentAvroConnector.CONFLUENT_MAGIC_BYTE, "Magic byte not present at start of confluent message!")
     val schemaId = msgBuffer.getInt
     val avroMsg = msg.slice(msgBuffer.position, msgBuffer.limit)
     //return
