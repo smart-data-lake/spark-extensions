@@ -3,7 +3,7 @@ package org.apache.spark.sql.confluent.avro
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import org.apache.spark.sql.Column
-import org.apache.spark.sql.confluent.ConfluentClient
+import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector}
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 
 import scala.collection.JavaConverters._
@@ -12,7 +12,7 @@ import scala.collection.mutable
 /**
  * Provides Spark SQL functions from/to_confluent_avro for decoding/encoding confluent avro messages.
  */
-class ConfluentAvroConnector(confluentClient: ConfluentClient[AvroSchema]) {
+class ConfluentAvroConnector(confluentClient: ConfluentClient[AvroSchema]) extends ConfluentConnector {
 
   /**
    * Converts a binary column of confluent avro format into its corresponding catalyst value according to the latest
@@ -23,7 +23,7 @@ class ConfluentAvroConnector(confluentClient: ConfluentClient[AvroSchema]) {
    * @param topic the topic name.
    * @param subjectType the subject type (key or value).
    */
-  def from_confluent_avro(data: Column, topic: String, subjectType: SubjectType): Column = {
+  override def from_confluent(data: Column, topic: String, subjectType: SubjectType): Column = {
     val subject = confluentClient.getSubject(topic, subjectType)
     new Column(ConfluentAvroDataToCatalyst(data.expr, subject, confluentClient))
   }
@@ -38,7 +38,7 @@ class ConfluentAvroConnector(confluentClient: ConfluentClient[AvroSchema]) {
    * @param updateAllowed if subject schema should be updated if compatible
    * @param eagerCheck if true tiggers instantiation of converter object instances
    */
-  def to_confluent_avro(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column = {
+  override def to_confluent(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column = {
     val subject = confluentClient.getSubject(topic, subjectType)
     val converterExpr = CatalystDataToConfluentAvro(data.expr, subject, confluentClient, updateAllowed, mutualReadCheck )
     if (eagerCheck) converterExpr.test()
@@ -89,7 +89,7 @@ object ConfluentAvroConnector {
     new ConfluentAvroConnector(new AvroConfluentClient(schemaRegistryUrl))
   }
 
-  private def parseAvroSchema(schema: String): Schema = {
+  def parseAvroSchema(schema: String): Schema = {
     new Schema.Parser().parse(schema)
   }
 }

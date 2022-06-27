@@ -20,6 +20,7 @@ package org.apache.spark.sql.confluent
 import io.confluent.kafka.schemaregistry.ParsedSchema
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, SchemaRegistryClient}
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.Column
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 
 import scala.collection.JavaConverters._
@@ -129,6 +130,29 @@ class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logg
   }
 }
 
+
+trait ConfluentConnector extends Serializable {
+
+  /**
+   * Convert a column from confluent format to Spark.
+   * @param data the binary column.
+   * @param topic the topic name.
+   * @param subjectType the subject type (key or value).
+   */
+  def from_confluent(data: Column, topic: String, subjectType: SubjectType): Column
+
+  /**
+   * Convert a column from Spark to confluent format.
+   * @param data the data column.
+   * @param topic the topic name.
+   * @param subjectType the subject type (key or value).
+   * @param updateAllowed if subject schema should be updated if compatible
+   * @param mutualReadCheck if a mutual read check or a simpler can read check should be executed
+   * @param eagerCheck if true tiggers instantiation of converter object instances (only if connector uses such mechanisms)
+   */
+  def to_confluent(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column
+
+}
 
 
 object SubjectType extends Enumeration {

@@ -20,7 +20,7 @@ class ConfluentAvroConnectorTest extends AnyFunSuite with Logging {
   private val schemaId1 = 1
 
   // json schemas
-  val jsonSchema1 = new AvroSchema(MySchemaConverters.toAvroType(df1.schema))
+  val jsonSchema1 = new AvroSchema(AvroSchemaConverter.toAvroType(df1.schema))
 
   // mock confluent client
   val confluentClientMock = mock[AvroConfluentClient]
@@ -36,11 +36,11 @@ class ConfluentAvroConnectorTest extends AnyFunSuite with Logging {
 
     // convert to avro
     val dfJson = df1
-      .select(avroConnector.to_confluent_avro(struct("*"), topicA, SubjectType.value).as("avro"))
+      .select(avroConnector.to_confluent(struct("*"), topicA, SubjectType.value).as("avro"))
 
     // convert back to spark
     val dfSpark = dfJson
-      .withColumn("data", avroConnector.from_confluent_avro($"avro", topicA, SubjectType.value).as("spark"))
+      .withColumn("data", avroConnector.from_confluent($"avro", topicA, SubjectType.value).as("spark"))
       .select($"data.*")
 
     assert(df1.head == dfSpark.head)

@@ -22,7 +22,7 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
   override lazy val dataType: DataType = {
     // Avro schema is not serializable in older versions. We must be careful to not store it in an attribute of the class.
     val (schemaId, schema) = confluentHelper.getLatestSchemaFromConfluent(subject)
-    MySchemaConverters.toSqlType(schema.rawSchema).dataType
+    AvroSchemaConverter.toSqlType(schema.rawSchema).dataType
   }
 
   override def nullable: Boolean = true
