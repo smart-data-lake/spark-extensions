@@ -7,7 +7,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, ExprUtils, Expression, NullIntolerant, StructsToJson, TimeZoneAwareExpression, UnaryExpression}
 import org.apache.spark.sql.catalyst.json.{JSONOptions, JacksonGenerator, JacksonUtils}
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
-import org.apache.spark.sql.confluent.ConfluentClient
+import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector}
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 import org.apache.spark.sql.types.{AbstractDataType, ArrayType, DataType, MapType, StringType, StructType, TypeCollection}
 import org.apache.spark.sql.{Column, functions}
@@ -17,39 +17,36 @@ import org.json4s.JsonAST.JObject
 import java.io.CharArrayWriter
 
 /**
- * Provides Spark SQL functions from/to_confluent_avro for decoding/encoding confluent avro messages.
+ * Provides Spark SQL functions from/to_confluent for decoding/encoding confluent json messages.
  */
-class ConfluentJsonConnector(confluentClient: ConfluentClient[JsonSchema]) extends Serializable {
+class ConfluentJsonConnector(confluentClient: ConfluentClient[JsonSchema]) extends ConfluentConnector {
 
   /**
-   * Converts a binary column of confluent avro format into its corresponding catalyst value according to the latest
+   * Converts a binary column of confluent json format into its corresponding catalyst value according to the latest
    * schema stored in schema registry.
-   * Note: copied from org.apache.spark.sql.avro.*
-   *
    * @param data the binary column.
    * @param topic the topic name.
    * @param subjectType the subject type (key or value).
    */
-  def from_confluent_json(data: Column, topic: String, subjectType: SubjectType): Column = {
+  override def from_confluent(data: Column, topic: String, subjectType: SubjectType): Column = {
     import org.json4s.jackson.JsonMethods.fromJsonNode
     val subject = confluentClient.getSubject(topic, subjectType)
     val (schemaId, schema) = confluentClient.getLatestSchemaFromConfluent(subject)
     val schemaJson = fromJsonNode(schema.toJsonNode).asInstanceOf[JObject]
     val sparkSchema = JsonSchemaConverter.convertToSpark(schemaJson, false)
-    functions.from_json(data, sparkSchema)
+    functions.from_json(data.cast(StringType), sparkSchema)
   }
 
   /**
-   * Converts a column into binary of confluent avro format according to the latest schema stored in schema registry.
-   * Note: copied from org.apache.spark.sql.avro.*
-   *
+   * Converts a column into binary of confluent json format according to the latest schema stored in schema registry.
    * @param data the data column.
    * @param topic the topic name.
    * @param subjectType the subject type (key or value).
    * @param updateAllowed if subject schema should be updated if compatible
    * @param mutualReadCheck if a mutual read check or a simpler can read check should be executed
+   * @param eagerCheck not relevant for to_json_confluent
    */
-  def to_confluent_json(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false): Column = {
+  override def to_confluent(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column = {
     to_json_confluent(data, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck)
   }
 

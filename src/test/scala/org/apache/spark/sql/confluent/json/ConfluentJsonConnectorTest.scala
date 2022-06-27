@@ -37,11 +37,11 @@ class ConfluentJsonConnectorTest extends AnyFunSuite with Logging {
 
     // convert to avro
     val dfJson = df1
-      .select(jsonConnector.to_confluent_json(struct("*"), topicA, SubjectType.value).as("json"))
+      .select(jsonConnector.to_confluent(struct("*"), topicA, SubjectType.value).as("json"))
 
     // convert back to spark
     val dfSpark = dfJson
-      .withColumn("data", jsonConnector.from_confluent_json($"json", topicA, SubjectType.value).as("spark"))
+      .withColumn("data", jsonConnector.from_confluent($"json", topicA, SubjectType.value).as("spark"))
       .select($"data.*")
 
     assert(df1.head == dfSpark.head)

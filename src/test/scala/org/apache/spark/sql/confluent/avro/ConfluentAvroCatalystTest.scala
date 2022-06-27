@@ -23,11 +23,11 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
   // expressions to define the dataType of the conversion
   val expr1 = struct(struct(lit(true).as("a1"), lit("testA").as("a2")).as("a")
     , lit(0f).as("c"), lit("ok").as("d")).expr
-  val avroSchema1 = new AvroSchema(MySchemaConverters.toAvroType(expr1.dataType, expr1.nullable))
+  val avroSchema1 = new AvroSchema(AvroSchemaConverter.toAvroType(expr1.dataType, expr1.nullable))
   val expr2 = struct(struct(lit(true).as("a1"), lit("testA").as("a2")).as("a")
                    , makeNullable(struct(lit(true).as("b1"), lit("testB").as("b2"))).as("b")
                    , lit(0f).as("c"), lit("ok").as("d")).expr
-  val avroSchema2 = new AvroSchema(MySchemaConverters.toAvroType(expr2.dataType, expr2.nullable))
+  val avroSchema2 = new AvroSchema(AvroSchemaConverter.toAvroType(expr2.dataType, expr2.nullable))
 
   // create internal rows
   val internalRowConverter1 = CatalystTypeConverters.createToCatalystConverter(expr1.dataType)

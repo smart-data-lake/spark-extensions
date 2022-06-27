@@ -34,7 +34,7 @@ import scala.util.Random
  * Copied from org.apache.spark.sql.avro.SchemaConverters
  * Changes: Backport support for nullType from Spark 3.0
  */
-object MySchemaConverters {
+object AvroSchemaConverter {
   private lazy val uuidGenerator = RandomUUIDGenerator(new Random().nextLong())
 
   private lazy val nullSchema = Schema.create(Schema.Type.NULL)
