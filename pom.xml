@@ -414,6 +414,14 @@
 		</dependency>
 
 		<dependency>
+			<groupId>org.apache.ws.xmlschema</groupId>
+			<artifactId>xmlschema-core</artifactId>
+			<!-- should match version of spark-xml -->
+			<version>2.2.5</version>
+			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
 			<groupId>org.scalatest</groupId>
 			<artifactId>scalatest_${scala.minor.version}</artifactId>
 			<version>${scalatest.version}</version>
