@@ -15,9 +15,10 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.avro.confluent
+package org.apache.spark.sql.custom
 
 import org.apache.spark.sql.Column
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnaryExpression}
 import org.apache.spark.sql.types.DataType
@@ -34,9 +35,17 @@ case class SetNullable(child: Expression, forcedNullable: Boolean) extends Unary
 }
 
 object NullableHelper {
+  /**
+   * Modifies the nullability property of a column to be not nullable.
+   * If the column contains null values at runtime, execution will stop with IllegalStateException.
+   * Often it's better to use coalesce to modify schema of a column to be not nullable, and set a default value for values that are null.
+   */
   def makeNotNullable(data: Column): Column = {
     new Column(SetNullable(data.expr, false))
   }
+  /**
+   * Modifies the nullability property of a column to be nullable.
+   */
   def makeNullable(data: Column): Column = {
     new Column(SetNullable(data.expr, true))
   }
