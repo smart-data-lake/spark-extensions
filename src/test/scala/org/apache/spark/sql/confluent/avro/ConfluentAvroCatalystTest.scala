@@ -1,10 +1,11 @@
-package org.apache.spark.sql.custom
+package org.apache.spark.sql.confluent.avro
 
+import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.avro.confluent.NullableHelper.makeNullable
-import org.apache.spark.sql.avro.confluent.{CatalystDataToConfluentAvro, ConfluentAvroDataToCatalyst, ConfluentClient, MySchemaConverters}
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
+import org.apache.spark.sql.confluent.{ConfluentClient, avro}
+import org.apache.spark.sql.custom.NullableHelper.makeNullable
 import org.apache.spark.sql.functions.{lit, struct}
 import org.mockito.Mockito._
 import org.scalatest.funsuite.AnyFunSuite
@@ -22,11 +23,11 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
   // expressions to define the dataType of the conversion
   val expr1 = struct(struct(lit(true).as("a1"), lit("testA").as("a2")).as("a")
     , lit(0f).as("c"), lit("ok").as("d")).expr
-  val avroSchema1 = MySchemaConverters.toAvroType(expr1.dataType, expr1.nullable)
+  val avroSchema1 = new AvroSchema(AvroSchemaConverter.toAvroType(expr1.dataType, expr1.nullable))
   val expr2 = struct(struct(lit(true).as("a1"), lit("testA").as("a2")).as("a")
                    , makeNullable(struct(lit(true).as("b1"), lit("testB").as("b2"))).as("b")
                    , lit(0f).as("c"), lit("ok").as("d")).expr
-  val avroSchema2 = MySchemaConverters.toAvroType(expr2.dataType, expr2.nullable)
+  val avroSchema2 = new AvroSchema(AvroSchemaConverter.toAvroType(expr2.dataType, expr2.nullable))
 
   // create internal rows
   val internalRowConverter1 = CatalystTypeConverters.createToCatalystConverter(expr1.dataType)
@@ -36,7 +37,7 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
   val internalRow1As2 = internalRowConverter2(row1As2).asInstanceOf[InternalRow]
 
   // mock confluent client
-  val confluentClientMock = mock[ConfluentClient]
+  val confluentClientMock = mock[ConfluentClient[AvroSchema]]
   val subjectA = "testA-value"
   when(confluentClientMock.setOrGetSchema(subjectA, avroSchema1)).thenReturn((schemaId1, avroSchema1)) // write record1 with schema1 -> no conversion here
   when(confluentClientMock.setOrGetSchema(subjectA, avroSchema2)).thenReturn((schemaId2, avroSchema2))
@@ -62,11 +63,11 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
   test("schema evolution on read: convert row with old schema to avro and back to row with current schema") {
 
     // convert to avro
-    val toAvroConverter = CatalystDataToConfluentAvro(expr1, subjectA, confluentClientMock, updateAllowed = false)
+    val toAvroConverter = avro.CatalystDataToConfluentAvro(expr1, subjectA, confluentClientMock, updateAllowed = false)
     val confluentAvroMsg = toAvroConverter.nullSafeEval(internalRow1)
 
     // convert back to spark row
-    val toRowConverter = ConfluentAvroDataToCatalyst(expr2, subjectA, confluentClientMock)
+    val toRowConverter = avro.ConfluentAvroDataToCatalyst(expr2, subjectA, confluentClientMock)
     val finalInternalRow = toRowConverter.nullSafeEval(confluentAvroMsg)
 
     assert(internalRow1As2 == finalInternalRow)
@@ -76,11 +77,11 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
   ignore("schema evolution on write: convert row with old schema to avro with new schema and back to row") {
 
     // convert to avro with new schema
-    val toAvroConverter = CatalystDataToConfluentAvro(expr1, subjectB, confluentClientMock, updateAllowed = false)
+    val toAvroConverter = avro.CatalystDataToConfluentAvro(expr1, subjectB, confluentClientMock, updateAllowed = false)
     val confluentAvroMsg = toAvroConverter.nullSafeEval(internalRow1)
 
     // convert back to spark row
-    val toRowConverter = ConfluentAvroDataToCatalyst(expr2, subjectB, confluentClientMock)
+    val toRowConverter = avro.ConfluentAvroDataToCatalyst(expr2, subjectB, confluentClientMock)
     val finalInternalRow = toRowConverter.nullSafeEval(confluentAvroMsg)
 
     assert(internalRow1As2 == finalInternalRow)
