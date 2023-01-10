@@ -15,7 +15,8 @@
       "required": [
         "item1",
         "item2"
-      ]
+      ],
+      "additionalProperties": false
     },
     "array": {
       "type": "array",
@@ -28,7 +29,8 @@
           "itemProperty2": {
             "type": "number"
           }
-        }
+        },
+        "additionalProperties": false
       }
     },
     "structure": {
@@ -45,10 +47,12 @@
               "value": {
                 "type": "integer"
               }
-            }
+            },
+            "additionalProperties": false
           }
         }
-      }
+      },
+      "additionalProperties": false
     },
     "integer": {
       "type": "integer"
@@ -80,5 +84,6 @@
     "string",
     "number",
     "boolean"
-  ]
+  ],
+  "additionalProperties": false
 }
