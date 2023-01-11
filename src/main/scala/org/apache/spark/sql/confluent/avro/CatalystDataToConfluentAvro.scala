@@ -6,7 +6,7 @@ import org.apache.avro.io.{BinaryEncoder, EncoderFactory}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnaryExpression}
-import org.apache.spark.sql.confluent.ConfluentClient
+import org.apache.spark.sql.confluent.{ConfluentClient, IncompatibleSchemaException}
 import org.apache.spark.sql.types.{BinaryType, DataType}
 
 import java.io.ByteArrayOutputStream
@@ -26,6 +26,7 @@ case class CatalystDataToConfluentAvro(child: Expression, subject: String, confl
     val newSchema = new AvroSchema(AvroSchemaConverter.toAvroType(child.dataType, child.nullable))
     val (schemaId, schema) = if (updateAllowed) confluentHelper.setOrUpdateSchema(subject, newSchema, mutualReadCheck)
     else confluentHelper.setOrGetSchema(subject, newSchema)
+    if (!updateAllowed && newSchema != schema) throw new IncompatibleSchemaException(s"New schema for subject $subject is different from existing schema and updateAllowed=false: Existing=$schema New=$newSchema")
     val serializer = new MyAvroSerializer(child.dataType, schema.rawSchema, child.nullable)
     val writer = new GenericDatumWriter[Any](schema.rawSchema)
     SerializerTools(schemaId, serializer, writer)
