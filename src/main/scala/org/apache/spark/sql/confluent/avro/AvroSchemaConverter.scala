@@ -21,6 +21,7 @@ import org.apache.avro.LogicalTypes.{Date, Decimal, TimestampMicros, TimestampMi
 import org.apache.avro.Schema.Type._
 import org.apache.avro.{LogicalTypes, Schema, SchemaBuilder}
 import org.apache.spark.sql.catalyst.util.RandomUUIDGenerator
+import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.types.Decimal.minBytesForPrecision
 import org.apache.spark.sql.types._
 
@@ -32,7 +33,10 @@ import scala.util.Random
  * versa.
  *
  * Copied from org.apache.spark.sql.avro.SchemaConverters
- * Changes: Backport support for nullType from Spark 3.0
+ *
+ * Changes:
+ * - Backport support for nullType from Spark 3.0
+ * - Fix nullable fields optional: null type must be first in union and default=null is needed
  */
 object AvroSchemaConverter {
   private lazy val uuidGenerator = RandomUUIDGenerator(new Random().nextLong())
@@ -179,7 +183,9 @@ object AvroSchemaConverter {
         st.foreach { f =>
           val fieldAvroType =
             toAvroType(f.dataType, f.nullable, f.name, childNameSpace)
-          fieldsAssembler.name(f.name).`type`(fieldAvroType).noDefault()
+          val field = fieldsAssembler.name(f.name).`type`(fieldAvroType)
+          if (f.nullable) field.withDefault(null) // CHANGED: add default=null for optional fields
+          else field.noDefault()
         }
         fieldsAssembler.endRecord()
 
@@ -187,11 +193,9 @@ object AvroSchemaConverter {
       case other => throw new IncompatibleSchemaException(s"Unexpected type $other.")
     }
     if (nullable && catalystType != NullType) {
-      Schema.createUnion(schema, nullSchema)
+      Schema.createUnion(nullSchema, schema) // CHANGED: nullSchema must be first for optional fields
     } else {
       schema
     }
   }
 }
-
-class IncompatibleSchemaException(msg: String, ex: Throwable = null) extends Exception(msg, ex)

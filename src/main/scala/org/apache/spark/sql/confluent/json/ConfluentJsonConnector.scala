@@ -7,7 +7,7 @@ import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, ExprUtils, Expression, NullIntolerant, StructsToJson, TimeZoneAwareExpression, UnaryExpression}
 import org.apache.spark.sql.catalyst.json.{JSONOptions, JacksonGenerator, JacksonUtils}
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
-import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector}
+import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector, IncompatibleSchemaException}
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 import org.apache.spark.sql.types.{AbstractDataType, ArrayType, DataType, MapType, StringType, StructType, TypeCollection}
 import org.apache.spark.sql.{Column, functions}
@@ -15,6 +15,7 @@ import org.apache.spark.unsafe.types.UTF8String
 import org.json4s.JsonAST.JObject
 
 import java.io.CharArrayWriter
+import scala.collection.Seq
 
 /**
  * Provides Spark SQL functions from/to_confluent for decoding/encoding confluent json messages.
@@ -33,7 +34,7 @@ class ConfluentJsonConnector(confluentClient: ConfluentClient[JsonSchema]) exten
     val subject = confluentClient.getSubject(topic, subjectType)
     val (schemaId, schema) = confluentClient.getLatestSchemaFromConfluent(subject)
     val schemaJson = fromJsonNode(schema.toJsonNode).asInstanceOf[JObject]
-    val sparkSchema = JsonSchemaConverter.convertToSpark(schemaJson, false)
+    val sparkSchema = JsonSchemaConverter.convertToSpark(schemaJson, isStrictTypingEnabled = false)
     functions.from_json(data.cast(StringType), sparkSchema)
   }
 
@@ -44,18 +45,18 @@ class ConfluentJsonConnector(confluentClient: ConfluentClient[JsonSchema]) exten
    * @param subjectType the subject type (key or value).
    * @param updateAllowed if subject schema should be updated if compatible
    * @param mutualReadCheck if a mutual read check or a simpler can read check should be executed
-   * @param eagerCheck not relevant for to_json_confluent
+   * @param eagerCheck if true tiggers instantiation of converter object instances
    */
   override def to_confluent(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column = {
-    to_json_confluent(data, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck)
+    to_json_confluent(data, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck, eagerCheck = eagerCheck)
   }
 
   /**
    * copied from spark.sql.functions.to_json to customize StructsToJsonWithConfluent
    */
   private def to_json_confluent(e: Column, confluentClient: ConfluentClient[JsonSchema],
-                                topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, options: Map[String, String] = Map()): Column = {
-    Column(StructsToJsonWithConfluent(options, e.expr, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck))
+                                topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false, options: Map[String, String] = Map()): Column = {
+    Column(StructsToJsonWithConfluent(options, e.expr, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck, eagerCheck))
   }
 
 }
@@ -74,7 +75,7 @@ case class StructsToJsonWithConfluent(
                           options: Map[String, String],
                           child: Expression,
                           confluentClient: ConfluentClient[JsonSchema],
-                          topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false,
+                          topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false,
                           timeZoneId: Option[String] = None)
   extends UnaryExpression with TimeZoneAwareExpression with CodegenFallback
     with ExpectsInputTypes with NullIntolerant {
@@ -90,13 +91,14 @@ case class StructsToJsonWithConfluent(
   @transient
   lazy val inputSchema: DataType = {
     // CHANGED: create/update schema in confluent
-    val schema = child.dataType.asInstanceOf[StructType]
+    val newSchema = child.dataType.asInstanceOf[StructType]
     import org.json4s.jackson.JsonMethods.asJsonNode
     val subject = confluentClient.getSubject(topic, subjectType)
-    val jsonSchema = new JsonSchema(asJsonNode(JsonSchemaConverter.convertFromSpark(schema)))
-    if (updateAllowed) confluentClient.setOrUpdateSchema(subject, jsonSchema, mutualReadCheck)
-    else confluentClient.setOrGetSchema(subject, jsonSchema)
-    schema
+    val newJsonSchema = new JsonSchema(asJsonNode(JsonSchemaConverter.convertFromSpark(newSchema)))
+    val (schemaId, jsonSchema) = if (updateAllowed) confluentClient.setOrUpdateSchema(subject, newJsonSchema, mutualReadCheck)
+    else confluentClient.setOrGetSchema(subject, newJsonSchema)
+    if (!updateAllowed && newJsonSchema != jsonSchema) throw new IncompatibleSchemaException(s"New schema for subject $subject is different from existing schema and updateAllowed=false: Existing=$jsonSchema New=$newJsonSchema")
+    newSchema
   }
 
   // This converts rows to the JSON output according to the given schema.
@@ -156,6 +158,9 @@ case class StructsToJsonWithConfluent(
       s"Input type ${child.dataType.catalogString} must be a struct, array of structs or " +
         "a map or array of map.")
   }
+
+  // trigger schema checks if eager validation is requested.
+  if (eagerCheck) checkInputDataTypes()
 
   override def withTimeZone(timeZoneId: String): TimeZoneAwareExpression =
     copy(timeZoneId = Option(timeZoneId))

@@ -1,10 +1,10 @@
 package org.apache.spark.sql.confluent.json
 
-import org.apache.spark.sql.confluent.avro.IncompatibleSchemaException
+import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.confluent.json.JsonSchemaConverter._
 import org.apache.spark.sql.types.{ArrayType, DataType, DecimalType, MapType, StringType, StructType}
 import org.json4s.{JArray, JObject, JString, JValue}
-import org.json4s.JsonAST.JField
+import org.json4s.JsonAST.{JBool, JField}
 
 object SparkToJsonSchemaConverter {
   def convert(schema: StructType): JObject = {
@@ -35,12 +35,12 @@ private case class JSchemaArray(items: JsonSchemaEntry) extends JsonSchemaEntry 
     JObject(super.toJson.obj :+ JField(SchemaArrayItems, items.toJson))
   }
 }
-private case class JSchemaObject(properties: Map[String,JsonSchemaEntry], required: Seq[String]) extends JsonSchemaEntry {
+private case class JSchemaObject(properties: Map[String,JsonSchemaEntry], required: Seq[String], additionalProperties: Boolean = false) extends JsonSchemaEntry {
   override val tpe: String = "object"
   override def toJson: JObject = {
     val propertiesFields = properties.toSeq.map { case (name, tpe) => JField(name, tpe.toJson) }
     val requiredField = if (required.nonEmpty) Some(JField(SchemaObjectPropertiesRequired, JArray(required.map(f => JString(f)).toList))) else None
-    JObject((super.toJson.obj :+ JField(SchemaObjectProperties, JObject(propertiesFields: _*))) ++ requiredField)
+    JObject((super.toJson.obj :+ JField(SchemaObjectProperties, JObject(propertiesFields: _*))) ++ requiredField :+ JField(SchemaAdditionalProperties, JBool.apply(additionalProperties)))
   }
 }
 private case class JSchemaMap(valueTpe: JsonSchemaEntry) extends JsonSchemaEntry {
