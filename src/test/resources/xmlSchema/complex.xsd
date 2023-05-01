@@ -99,6 +99,9 @@
             <xs:element name="reason" type="xs:string" minOccurs="0" />
         </xs:sequence>
         <xs:attribute name="nodeType" use="required">
+            <xs:annotation>
+                <xs:documentation>Test Documentation</xs:documentation>
+            </xs:annotation>
             <xs:simpleType>
                 <xs:restriction base="xs:string">
                     <xs:enumeration value="A" />
