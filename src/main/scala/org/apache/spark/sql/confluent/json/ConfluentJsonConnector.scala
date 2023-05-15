@@ -132,7 +132,7 @@ case class StructsToJsonWithConfluent(
   override def checkInputDataTypes(): TypeCheckResult = inputSchema match {
     case struct: StructType =>
       try {
-        JacksonUtils.verifySchema(struct)
+        struct.foreach(field => JacksonUtils.verifyType(field.name, field.dataType))
         TypeCheckResult.TypeCheckSuccess
       } catch {
         case e: UnsupportedOperationException =>
