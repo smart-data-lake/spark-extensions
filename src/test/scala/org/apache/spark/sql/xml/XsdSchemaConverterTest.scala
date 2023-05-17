@@ -39,6 +39,8 @@ class XsdSchemaConverterTest extends AnyFunSuite {
     assert(nodeStructType.fieldNames.contains("_validFrom"))
     // recursion
     assert(nodeStructType.fieldNames.toSeq == nodeStructType("nodes").dataType.asInstanceOf[StructType]("node").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType].fieldNames.toSeq)
+    // documentation
+    nodeStructType("_nodeType").getComment().contains("Test Documentation")
   }
 
   def extractSubDataType(schema: StructType, elementName: String): Option[DataType] = {
