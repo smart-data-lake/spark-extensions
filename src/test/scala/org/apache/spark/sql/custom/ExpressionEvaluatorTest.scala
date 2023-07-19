@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.functions._
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -70,18 +69,14 @@ class ExpressionEvaluatorTest extends AnyFunSuite {
 
   test("evaluate expression: exception with unknown attribute contains its name") {
     val expression = "concat(s[0].y, b, abc)"
-    val ex = intercept[IllegalArgumentException](new ExpressionEvaluator[TestObj,Any](expr(expression)))
+    val ex = intercept[Exception](new ExpressionEvaluator[TestObj,Any](expr(expression)))
     assert(ex.getMessage.contains("abc"))
   }
 
   test("evaluate expression: evaluation is case sensitive") {
     val expression = "concat(s[0].Y, b)"
-    val evaluator = new ExpressionEvaluator[TestObj, String](expr(expression))
-    val result = evaluator.apply(input)
-    assert(result.contains("ok"))
-
-    //val ex = intercept[IllegalArgumentException](new ExpressionEvaluator[TestObj,Any](expr(expression)))
-    //assert(ex.getMessage.contains("Y"))
+    val ex = intercept[Exception](new ExpressionEvaluator[TestObj, Any](expr(expression)))
+    assert(ex.getMessage.contains("Y"))
   }
 
   test("evaluate expression: RuntimeReplaceable expressions are replaced") {

@@ -117,6 +117,7 @@ object ExpressionEvaluator extends Logging {
     val analyzer = new Analyzer(catalogManager) {
       override def resolver: Resolver = caseSensitiveResolution // resolve identifiers in expressions case-sensitive
     }
+    analyzer.conf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
     // only apply a small selection of optimizer rules needed to evaluate simple expressions.
     val optimizerRules = Seq(ReplaceExpressions, ComputeCurrentTime, ReplaceCurrentLike(catalogManager), ReplaceUpdateFieldsExpression)
     (analyzer, optimizerRules)
