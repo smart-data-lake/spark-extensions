@@ -151,7 +151,7 @@
 		<scala.version>${scala.minor.version}.17</scala.version>
 
 		<spark.version>3.4.1</spark.version>
-		<confluent.version>6.2.1</confluent.version>
+		<confluent.version>7.4.1</confluent.version>
 
 		<scalatest.version>3.2.2</scalatest.version>
 	</properties>
