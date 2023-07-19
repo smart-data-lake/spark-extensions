@@ -6,7 +6,7 @@ import org.apache.spark.sql.Column
 import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector}
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
 /**
@@ -62,7 +62,7 @@ class ConfluentAvroConnector(confluentClient: ConfluentClient[AvroSchema]) exten
         val f2m1 = fields2.keys.toSeq.diff(fields1.keys.toSeq)
         if (f2m1.nonEmpty) diffs += s"""fields ${f2m1.mkString(", ")} missing in schema1"""
         diffs ++= fields1.keys.toSeq.intersect(fields2.keys.toSeq).flatMap( f => debugSchemaDiff(debugSchemaReduceUnion(fields1(f)),debugSchemaReduceUnion(fields2(f)), Some(f)))
-        diffs
+        diffs.toSeq
       } else Seq()
     }
   }

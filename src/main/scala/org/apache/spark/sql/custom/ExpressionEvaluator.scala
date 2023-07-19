@@ -35,7 +35,7 @@ import org.apache.spark.sql.{Column, Encoders}
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 
 /**
  * ExpressionEvaluator can evaluate a Spark SQL expression against a case class
@@ -49,7 +49,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
 
   // prepare evaluator (this is Spark internal API)
   private val dataEncoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
-  private val dataSerializer = dataEncoder.createSerializer
+  private val dataSerializer = dataEncoder.createSerializer()
   private val expr = resolveExpression(exprCol, dataEncoder.schema)
 
   // check if expression is fully resolved
@@ -61,7 +61,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
   // prepare result deserializer
   // If result type is any, we just convert types to scala, but there is no decoding into case classes possible.
   val (resultDataType, resultDeserializer) = if (classTagR.runtimeClass != classOf[Any]) {
-    val encoder = ExpressionEncoder[R]
+    val encoder = ExpressionEncoder[R]()
     val dataType = encoder.schema.head.dataType
     // check if resulting datatype matches
     require(DataType.equalsStructurally(expr.dataType, dataType, ignoreNullability = true), s"expression result data type ${expr.dataType} does not match requested datatype $dataType")
@@ -95,23 +95,23 @@ object ExpressionEvaluator extends Logging {
     // Databricks has a modified Spark 3.1/3.2 Version, we try to create original catalog manager and the databricks version while catching exception to report them later.
     val originalCatalogManager = try {
       val simpleCatalog = new SessionCatalog(externalCatalog, functionRegistry, sqlConf) {
-        override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = Unit
+        override def createDatabase(dbDefinition: CatalogDatabase, ignoreIfExists: Boolean): Unit = ()
       }
-      Right(new CatalogManager(FakeV2SessionCatalog, simpleCatalog))
+      Success(new CatalogManager(FakeV2SessionCatalog, simpleCatalog))
     } catch {
       // NoSuchMethodError extends Throwable directly, which is not caught by Try...
-      case t: Throwable => Left(t)
+      case t: Throwable => Failure(t)
     }
     val databricksCatalogManager = try {
-      Right(createDatabricksCatalogManager(externalCatalog, sqlConf))
+      Success(createDatabricksCatalogManager(externalCatalog, sqlConf))
     } catch {
-      case t: Throwable => Left(t)
+      case t: Throwable => Failure(t)
     }
-    val catalogManager = originalCatalogManager.toTry
-      .orElse(databricksCatalogManager.toTry)
+    val catalogManager = originalCatalogManager
+      .orElse(databricksCatalogManager)
       .getOrElse{
-        logError("Exception for Spark original API", originalCatalogManager.left.get)
-        logError("Exception for Databricks modified API", databricksCatalogManager.left.get)
+        logError("Exception for Spark original API", originalCatalogManager.failed.get)
+        logError("Exception for Databricks modified API", databricksCatalogManager.failed.get)
         throw new RuntimeException("Could not create SessionCatalog")
       }
     val analyzer = new Analyzer(catalogManager) {

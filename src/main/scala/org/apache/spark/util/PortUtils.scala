@@ -21,7 +21,8 @@ import _root_.io.netty.channel.unix.Errors.NativeIoException
 import org.sparkproject.jetty.util.MultiException
 
 import java.net.BindException
-import scala.collection.convert.ImplicitConversions.`iterable AsScalaIterable`
+import scala.jdk.CollectionConverters._
+
 /**
  * Utility-Methods for finding out the next available port to bind to.
  *
@@ -90,7 +91,7 @@ object PortUtils {
         }
         isBindCollision(e.getCause)
       case e: MultiException =>
-        e.getThrowables.exists(isBindCollision)
+        e.getThrowables.asScala.exists(isBindCollision)
       case e: NativeIoException =>
         (e.getMessage != null && e.getMessage.startsWith("bind() failed: ")) ||
           isBindCollision(e.getCause)
