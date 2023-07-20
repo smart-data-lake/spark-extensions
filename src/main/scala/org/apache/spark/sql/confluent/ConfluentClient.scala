@@ -25,7 +25,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.Column
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.collection.mutable
 
 /**
@@ -119,7 +119,7 @@ class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logg
    * @return list of compatibility violations
    **/
   protected def checkSchemaCanRead(dataSchema: S, readSchema: S): Seq[String] = {
-    readSchema.isBackwardCompatible(dataSchema).asScala
+    readSchema.isBackwardCompatible(dataSchema).asScala.toSeq
   }
 
   /**
@@ -128,7 +128,7 @@ class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logg
    * @return list of compatibility violations
    **/
   protected def checkSchemaMutualReadable(schema1: S, schema2: S): Seq[String] = {
-    schema1.isBackwardCompatible(schema2).asScala ++ schema2.isBackwardCompatible(schema1).asScala
+    (schema1.isBackwardCompatible(schema2).asScala ++ schema2.isBackwardCompatible(schema1).asScala).toSeq
   }
 }
 

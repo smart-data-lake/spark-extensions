@@ -15,7 +15,7 @@ object SparkToJsonSchemaConverter {
     catalystType match {
       case ArrayType(et, containsNull) => JSchemaArray(toJSchemaType(et))
       case MapType(StringType, vt, valueContainsNull) => JSchemaMap(toJSchemaType(vt))
-      case st: StructType => JSchemaObject(st.fields.map(f => (f.name, toJSchemaType(f.dataType))).toMap, st.fields.filterNot(_.nullable).map(_.name))
+      case st: StructType => JSchemaObject(st.fields.map(f => (f.name, toJSchemaType(f.dataType))).toMap, st.fields.filterNot(_.nullable).toSeq.map(_.name))
       case d: DecimalType if d.scale == 0 => JSchemaBasicType("integer")
       case d: DecimalType => JSchemaBasicType("number")
       case x => SparkToJsonTypeMap.get(x).map(JSchemaBasicType)

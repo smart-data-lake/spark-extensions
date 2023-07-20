@@ -46,17 +46,6 @@ jobs:
     - name: Maven Set Release Version
       run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
 
-    - name: Maven deploy to sonatype for Scala 2.11, only if on master-spark2* branch
-      if: ${{ contains(github.base_ref, 'master-spark2') }}
-      uses: samuelmeuli/action-maven-publish@v1
-      with:
-        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-        gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
-        nexus_username: ${{ secrets.SONATYPE_USERNAME }}
-        nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
-        maven_profiles: scala-2.11,release-sonatype
-        maven_args: -B -f pom.xml
-
     - name: Maven deploy to sonatype for Scala 2.12
       uses: samuelmeuli/action-maven-publish@v1
       with:
@@ -65,6 +54,16 @@ jobs:
         nexus_username: ${{ secrets.SONATYPE_USERNAME }}
         nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
         maven_profiles: scala-2.12,release-sonatype
+        maven_args: -B -f pom.xml
+
+    - name: Maven deploy to sonatype for Scala 2.13
+      uses: samuelmeuli/action-maven-publish@v1
+      with:
+        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
+        nexus_username: ${{ secrets.SONATYPE_USERNAME }}
+        nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
+        maven_profiles: scala-2.13,release-sonatype
         maven_args: -B -f pom.xml
 
     - name: Git Commit

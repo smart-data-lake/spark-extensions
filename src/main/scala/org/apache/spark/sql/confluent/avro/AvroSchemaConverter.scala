@@ -25,7 +25,7 @@ import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.types.Decimal.minBytesForPrecision
 import org.apache.spark.sql.types._
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import scala.util.Random
 
 /**
@@ -89,7 +89,7 @@ object AvroSchemaConverter {
         val fields = avroSchema.getFields.asScala.map { f =>
           val schemaType = toSqlTypeHelper(f.schema(), newRecordNames)
           StructField(f.name, schemaType.dataType, schemaType.nullable)
-        }
+        }.toSeq
 
         SchemaType(StructType(fields), nullable = false)
 
@@ -130,7 +130,7 @@ object AvroSchemaConverter {
                 val schemaType = toSqlTypeHelper(s, existingRecordNames)
                 // All fields are nullable because only one of them is set at a time
                 StructField(s"member$i", schemaType.dataType, nullable = true)
-            }
+            }.toSeq
 
             SchemaType(StructType(fields), nullable = false)
         }

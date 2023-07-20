@@ -4,18 +4,17 @@ import io.confluent.kafka.schemaregistry.json.JsonSchema
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, ExprUtils, Expression, NullIntolerant, StructsToJson, TimeZoneAwareExpression, UnaryExpression}
+import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, NullIntolerant, TimeZoneAwareExpression, UnaryExpression}
 import org.apache.spark.sql.catalyst.json.{JSONOptions, JacksonGenerator, JacksonUtils}
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
-import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector, IncompatibleSchemaException}
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
-import org.apache.spark.sql.types.{AbstractDataType, ArrayType, DataType, MapType, StringType, StructType, TypeCollection}
+import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector, IncompatibleSchemaException}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.{Column, functions}
 import org.apache.spark.unsafe.types.UTF8String
 import org.json4s.JsonAST.JObject
 
 import java.io.CharArrayWriter
-import scala.collection.Seq
 
 /**
  * Provides Spark SQL functions from/to_confluent for decoding/encoding confluent json messages.
@@ -132,7 +131,7 @@ case class StructsToJsonWithConfluent(
   override def checkInputDataTypes(): TypeCheckResult = inputSchema match {
     case struct: StructType =>
       try {
-        JacksonUtils.verifySchema(struct)
+        struct.foreach(field => JacksonUtils.verifyType(field.name, field.dataType))
         TypeCheckResult.TypeCheckSuccess
       } catch {
         case e: UnsupportedOperationException =>

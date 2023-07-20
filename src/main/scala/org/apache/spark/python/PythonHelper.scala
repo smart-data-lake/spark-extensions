@@ -20,7 +20,6 @@ package org.apache.spark.python
 import java.io.{File, PrintWriter}
 import java.net.InetAddress
 import java.nio.file.Files
-
 import org.apache.spark.SparkUserAppException
 import org.apache.spark.api.java.JavaSparkContext
 import org.apache.spark.api.python.PythonUtils
@@ -30,8 +29,8 @@ import org.apache.spark.internal.config._
 import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.util.{RedirectThread, Utils}
 
-import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
+import scala.jdk.CollectionConverters._
 
 /**
  * Functions to execute Python-Spark code
@@ -50,7 +49,7 @@ object PythonHelper extends Logging {
    *                      This is used to transfer SparkContext to python and can hold additional custom parameters.
    *                      entryPointObj must at least implement trait SparkEntryPoint.
    */
-  def exec[T<:SparkEntryPoint](entryPointObj: T, pythonCode: String) {
+  def exec[T<:SparkEntryPoint](entryPointObj: T, pythonCode: String): Unit = {
     val pythonFile = File.createTempFile("pythontransform",".py")
     val pyFiles = ""
     val otherArgs = Seq[String]()
@@ -105,7 +104,7 @@ object PythonHelper extends Logging {
     pathElements ++= formattedPyFiles
     pathElements += PythonUtils.sparkPythonPath
     pathElements += sys.env.getOrElse("PYTHONPATH", "")
-    val pythonPath = PythonUtils.mergePythonPaths(pathElements: _*)
+    val pythonPath = PythonUtils.mergePythonPaths(pathElements.toSeq: _*)
 
     // Launch Python process
     val builder = new ProcessBuilder((Seq(pythonExec, formattedPythonFile) ++ otherArgs).asJava)

@@ -18,7 +18,7 @@ import java.io.{File, FileInputStream, InputStreamReader, StringReader}
 import java.nio.charset.StandardCharsets
 import java.nio.file.Path
 
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 import org.apache.spark.annotation.Experimental
 import org.apache.spark.sql.types._
 import org.apache.ws.commons.schema._
@@ -155,7 +155,7 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
                   case StructType(fields) => fields.toSeq
                 }.getOrElse(Seq())
                 val childFields = mapParticle(complexType.getParticle, path :+ complexType.getName)
-                val attributes = mapAttributes(complexType.getAttributes.asScala, path)
+                val attributes = mapAttributes(complexType.getAttributes.asScala.toSeq, path)
                 val fields = baseFields ++ childFields ++ attributes
                 if (fields.nonEmpty) Some(addComment(StructField(complexType.getName, StructType(fields)), complexType))
                 else None
@@ -164,7 +164,7 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
             }
           case null =>
             val childFields = mapParticle(complexType.getParticle, path :+ complexType.getName)
-            val attributes = mapAttributes(complexType.getAttributes.asScala, path :+ complexType.getName)
+            val attributes = mapAttributes(complexType.getAttributes.asScala.toSeq, path :+ complexType.getName)
             val fields = childFields ++ attributes
             if (fields.nonEmpty) Some(addComment(StructField(complexType.getName, StructType(fields)), complexType))
             else None
@@ -187,7 +187,7 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
               val nullable = element.getMinOccurs == 0
               addComment(StructField(element.getName, t, nullable), element)
             }
-        }
+        }.toSeq
       // xs:choice
       case choice: XmlSchemaChoice =>
         choice.getItems.asScala.flatMap {
@@ -203,7 +203,7 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
           case any: XmlSchemaAny =>
             val dataType = if (math.max(any.getMaxOccurs, choice.getMaxOccurs) > 1) ArrayType(StringType) else StringType
             Some(addComment(StructField(XmlOptions.DEFAULT_WILDCARD_COL_NAME, dataType, true), any))
-        }
+        }.toSeq
       // xs:sequence
       case sequence: XmlSchemaSequence =>
         // flatten xs:choice nodes
@@ -231,7 +231,7 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
             Seq(Some(addComment(StructField(XmlOptions.DEFAULT_WILDCARD_COL_NAME, dataType, nullable), any)))
           case unsupported =>
             throw new IllegalArgumentException(s"Unsupported item: $unsupported")
-        }).flatten
+        }).flatten.toSeq
       case null =>
         Seq.empty
       case unsupported =>

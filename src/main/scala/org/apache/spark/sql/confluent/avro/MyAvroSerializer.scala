@@ -31,7 +31,7 @@ import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.types._
 
 import java.nio.ByteBuffer
-import scala.collection.JavaConverters._
+import scala.jdk.CollectionConverters._
 
 /**
  * A serializer to serialize data in catalyst format to data in avro format.

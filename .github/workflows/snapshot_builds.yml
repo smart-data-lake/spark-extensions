@@ -30,12 +30,11 @@ jobs:
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-maven-
 
-    - name: Build with Maven for Scala 2.11, only if on develop-spark2* branch
-      if: ${{ contains(github.base_ref, 'develop-spark2') || contains(github.ref, 'develop-spark2') }}
-      run: mvn -P scala-2.11 -B clean test --file pom.xml
-
     - name: Build with Maven for Scala 2.12
       run: mvn -P scala-2.12 -B clean test --file pom.xml
+
+    - name: Build with Maven for Scala 2.13
+      run: mvn -P scala-2.13 -B clean test --file pom.xml
 
   deploy:
     needs: build
@@ -73,13 +72,12 @@ jobs:
           maven_profiles: scala-2.12,release-sonatype
           maven_args: -B -DskipTests -f pom.xml
 
-      - name: Maven deploy to sonatype for Scala 2.11
-        if: ${{ contains(github.base_ref, 'develop-spark2') || contains(github.ref, 'develop-spark2')}}
+      - name: Maven deploy to sonatype for Scala 2.13
         uses: samuelmeuli/action-maven-publish@v1
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
           nexus_username: ${{ secrets.SONATYPE_USERNAME }}
           nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
-          maven_profiles: scala-2.11,release-sonatype
+          maven_profiles: scala-2.13,release-sonatype
           maven_args: -B -DskipTests -f pom.xml
