@@ -50,7 +50,9 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
   // prepare evaluator (this is Spark internal API)
   private val dataEncoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
   private val dataSerializer = dataEncoder.createSerializer()
-  private val expr = resolveExpression(exprCol, dataEncoder.schema)
+  private val expr = SQLConf.withExistingConf(ExpressionEvaluator.sqlConf) {
+    resolveExpression(exprCol, dataEncoder.schema)
+  }
 
   // check if expression is fully resolved
   require(expr.resolved, {
@@ -87,10 +89,12 @@ object ExpressionEvaluator extends Logging {
   // keep our own function registry
   private lazy val functionRegistry = FunctionRegistry.builtin.clone()
 
+  // initialize case sensitive SQLConf
+  private val sqlConf = new SQLConf()
+  sqlConf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
+
   // create a simple catalyst analyzer and optimizer rule list supporting builtin functions
   private lazy val (analyzer, optimizerRules): (Analyzer, Seq[Rule[LogicalPlan]]) = {
-    val sqlConf = new SQLConf()
-    sqlConf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
     val externalCatalog = new InMemoryCatalog
     // Databricks has a modified Spark 3.1/3.2 Version, we try to create original catalog manager and the databricks version while catching exception to report them later.
     val originalCatalogManager = try {
@@ -117,7 +121,6 @@ object ExpressionEvaluator extends Logging {
     val analyzer = new Analyzer(catalogManager) {
       override def resolver: Resolver = caseSensitiveResolution // resolve identifiers in expressions case-sensitive
     }
-    analyzer.conf.setConf(SQLConf.CASE_SENSITIVE, true) // resolve identifiers in expressions case-sensitive
     // only apply a small selection of optimizer rules needed to evaluate simple expressions.
     val optimizerRules = Seq(ReplaceExpressions, ComputeCurrentTime, ReplaceCurrentLike(catalogManager), ReplaceUpdateFieldsExpression)
     (analyzer, optimizerRules)
