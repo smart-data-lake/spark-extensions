@@ -97,6 +97,7 @@
         <xs:sequence>
             <xs:element name="name" type="xs:string" minOccurs="0" />
             <xs:element name="reason" type="xs:string" minOccurs="0" />
+            <xs:element ref="comment" minOccurs="0" />
         </xs:sequence>
         <xs:attribute name="nodeType" use="required">
             <xs:annotation>
@@ -123,4 +124,5 @@
         <xs:attribute name="validFrom" type="xs:date" use="required" />
         <xs:attribute name="validTo" type="xs:date" use="required" />
     </xs:attributeGroup>
+    <xs:element name="comment" type="xs:string" />
 </xs:schema>
