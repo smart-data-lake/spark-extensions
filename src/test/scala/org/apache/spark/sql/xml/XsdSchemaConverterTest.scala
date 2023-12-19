@@ -45,6 +45,7 @@ class XsdSchemaConverterTest extends AnyFunSuite {
     val nodeDeletedArrayType = getNestedElement(schema, Seq("tree","nodes","deleted","node")).asInstanceOf[ArrayType]
     val nodeDeletedStructType = nodeDeletedArrayType.elementType.asInstanceOf[StructType]
     assert(nodeDeletedStructType.fieldNames.contains("comment"))
+    assert(nodeDeletedStructType("comment").nullable)
   }
 
   def getNestedElement(schema: StructType, path: Seq[String]): DataType = {

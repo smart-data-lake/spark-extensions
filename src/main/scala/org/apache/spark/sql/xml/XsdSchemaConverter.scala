@@ -179,7 +179,10 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
   def resolveRef[T <: XmlSchemaObjectBase](e: XmlSchemaObjectBase): XmlSchemaObjectBase = e match {
     case e: XmlSchemaElement if e.getRef != null && e.getRef.getTargetQName != null =>
       assert(e.getRef.getTarget != null, s"Reference to '${e.getRef.getTargetQName}' not found")
-      resolveRef(e.getRef.getTarget)
+      val target = e.getRef.getTarget
+      if (e.getMinOccurs == 0) target.setMinOccurs(0)
+      if (e.getMaxOccurs > 1) target.setMaxOccurs(e.getMaxOccurs)
+      resolveRef(target)
     case e => e
   }
 
