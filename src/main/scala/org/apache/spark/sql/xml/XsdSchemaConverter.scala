@@ -32,6 +32,7 @@ import org.apache.ws.commons.schema.utils.XmlSchemaObjectBase
  * - support for attributeGroup
  * - avoid Stackoverflow Error for recursive definitions by implementing max recursion depth
  * - nested lists with maxOccurs >0 on xs:sequence tag
+ * - resolving types and refs
  * - add comments from xsd to spark schema
  */
 @Experimental
