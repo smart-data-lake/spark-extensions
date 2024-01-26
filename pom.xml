@@ -19,7 +19,8 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>spark-extensions_${scala.minor.version}</artifactId>
-	<version>3.4.2-SNAPSHOT</version>
+	<version>3.5.0-SNAPSHOT</version>
+
 	<packaging>jar</packaging>
 
 	<licenses>
@@ -150,9 +151,9 @@
 		<scala.minor.version>2.12</scala.minor.version>
 		<scala.version>${scala.minor.version}.17</scala.version>
 
-		<spark.version>3.4.1</spark.version>
-		<confluent.version>7.4.1</confluent.version>
-
+		<spark.version>3.5.0</spark.version>
+		<confluent.version>7.5.1</confluent.version>
+		<jackson.version>2.15.2</jackson.version>
 		<scalatest.version>3.2.2</scalatest.version>
 	</properties>
 
@@ -340,6 +341,7 @@
 					<environmentVariables>
 						<SPARK_LOCAL_IP>127.0.0.1</SPARK_LOCAL_IP> <!-- Suppresses Spark IP discovery during tests (when executed with mvn test) -->
 					</environmentVariables>
+					<argLine>--add-exports java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.lang.invoke=ALL-UNNAMED --add-opens=java.base/java.lang.reflect=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.base/java.net=ALL-UNNAMED --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/java.util=ALL-UNNAMED --add-opens=java.base/java.util.concurrent=ALL-UNNAMED --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED --add-opens=java.base/sun.nio.cs=ALL-UNNAMED --add-opens=java.base/sun.security.action=ALL-UNNAMED --add-opens=java.base/sun.util.calendar=ALL-UNNAMED</argLine>
 				</configuration>
 				<executions>
 					<execution>
@@ -359,6 +361,18 @@
 
 		</plugins>
 	</build>
+
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>com.fasterxml.jackson</groupId>
+				<artifactId>jackson-bom</artifactId>
+				<version>${jackson.version}</version>
+				<scope>import</scope>
+				<type>pom</type>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
 	<dependencies>
 

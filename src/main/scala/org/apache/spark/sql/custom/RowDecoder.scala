@@ -18,6 +18,7 @@
 package org.apache.spark.sql.custom
 
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.{Encoders, Row}
 
@@ -34,7 +35,7 @@ class RowDecoder[T <: Product : TypeTag] extends Serializable {
 
   private val encoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
   private val internalRowConverter = CatalystTypeConverters.createToCatalystConverter(encoder.schema)
-  private val resolvedEncoder = encoder.resolveAndBind(encoder.schema.toAttributes)
+  private val resolvedEncoder = encoder.resolveAndBind(DataTypeUtils.toAttributes(encoder.schema))
   private val rowDeserializer = resolvedEncoder.createDeserializer()
 
   /**

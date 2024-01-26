@@ -7,7 +7,7 @@ import org.apache.spark.sql.avro.AvroDeserializer
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, UnaryExpression}
 import org.apache.spark.sql.confluent.ConfluentClient
-import org.apache.spark.sql.internal.SQLConf.LegacyBehaviorPolicy
+import org.apache.spark.sql.internal.LegacyBehaviorPolicy
 import org.apache.spark.sql.types.{AbstractDataType, BinaryType, DataType}
 
 import java.nio.ByteBuffer

@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
 import org.apache.spark.sql.catalyst.optimizer.{ComputeCurrentTime, ReplaceCurrentLike, ReplaceExpressions, ReplaceUpdateFieldsExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.custom.ExpressionEvaluator.{findUnresolvedAttributes, resolveExpression}
@@ -67,7 +68,7 @@ class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implici
     val dataType = encoder.schema.head.dataType
     // check if resulting datatype matches
     require(DataType.equalsStructurally(expr.dataType, dataType, ignoreNullability = true), s"expression result data type ${expr.dataType} does not match requested datatype $dataType")
-    val resolvedEncoder = encoder.resolveAndBind(encoder.schema.toAttributes)
+    val resolvedEncoder = encoder.resolveAndBind(DataTypeUtils.toAttributes(encoder.schema))
     val deserializer = (result: Any) => resolvedEncoder.createDeserializer()(InternalRow(result))
     (dataType, deserializer)
   } else {
@@ -166,7 +167,7 @@ object ExpressionEvaluator extends Logging {
   def resolveExpression(exprCol: Column, schema: StructType, caseSensitive: Boolean = true): Expression = {
     val schemaPrep = if (caseSensitive) schema
     else StructType(schema.map(f => f.copy(name = f.name.toLowerCase)))
-    val attributes = schemaPrep.toAttributes
+    val attributes = DataTypeUtils.toAttributes(schemaPrep)
     val localRelation = LocalRelation(attributes)
     val rawPlan = Project(Seq(exprCol.alias("test").named),localRelation)
     val resolvedPlan = analyzer.execute(rawPlan)
