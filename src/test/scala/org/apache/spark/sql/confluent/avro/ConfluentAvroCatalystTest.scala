@@ -14,19 +14,22 @@ import org.scalatestplus.mockito.MockitoSugar.mock
 class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
 
   // test data
-  val row1 = Row(Row(true, "a"), 0f, "ok")
+  val row1 = Row(Row(true, "a"), 0f, "ok", 1)
   val schemaId1 = 1
-  val row2 = Row(Row(true, "a"), Row(true, "b"), 0f, "ok")
+  val row2 = Row(Row(true, "a"), Row(true, "b"), 0f, "ok", 1L)
   val schemaId2 = 2
-  val row1As2 = Row(Row(true, "a"), null, 0f, "ok")
+  val row1As2 = Row(Row(true, "a"), null, 0f, "ok", 1L)
 
   // expressions to define the dataType of the conversion
   val expr1 = struct(struct(lit(true).as("a1"), lit("testA").as("a2")).as("a")
-    , lit(0f).as("c"), lit("ok").as("d")).expr
+    , lit(0f).as("c"), lit("ok").as("d"), lit(1).as("e")).expr
   val avroSchema1 = new AvroSchema(AvroSchemaConverter.toAvroType(expr1.dataType, expr1.nullable))
   val expr2 = struct(struct(lit(true).as("a1"), lit("testA").as("a2")).as("a")
-                   , makeNullable(struct(lit(true).as("b1"), lit("testB").as("b2"))).as("b")
-                   , lit(0f).as("c"), lit("ok").as("d")).expr
+    // new nullable field
+    , makeNullable(struct(lit(true).as("b1"), lit("testB").as("b2"))).as("b")
+    , lit(0f).as("c"), lit("ok").as("d")
+    // int -> long
+    , lit(1L).as("e")).expr
   val avroSchema2 = new AvroSchema(AvroSchemaConverter.toAvroType(expr2.dataType, expr2.nullable))
 
   // create internal rows
