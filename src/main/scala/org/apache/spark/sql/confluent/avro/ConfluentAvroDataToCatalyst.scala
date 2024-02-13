@@ -19,11 +19,10 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
 
   override def inputTypes: Seq[AbstractDataType] = Seq(BinaryType)
 
-  override lazy val dataType: DataType = {
-    // Avro schema is not serializable in older versions. We must be careful to not store it in an attribute of the class.
-    val (schemaId, schema) = confluentHelper.getLatestSchemaFromConfluent(subject)
-    AvroSchemaConverter.toSqlType(schema.rawSchema).dataType
-  }
+  // Avro schema is not serializable in older versions. We must be careful to not store it in an attribute of the class.
+  @transient private lazy val subjectSchema = confluentHelper.getLatestSchemaFromConfluent(subject)._2
+
+  override lazy val dataType: DataType = AvroSchemaConverter.toSqlType(subjectSchema.rawSchema).dataType
 
   override def nullable: Boolean = true
 
@@ -40,9 +39,9 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
     val (schemaId, avroMsg) = parseConfluentMsg(binary)
     val (_, msgSchema) = confluentHelper.getSchemaFromConfluent(schemaId)
     avroBinaryDecoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, avroBinaryDecoder)
-    val avroReader = avroReaders.getOrElseUpdate(schemaId, new GenericDatumReader[Any](msgSchema.rawSchema))
+    val avroReader = avroReaders.getOrElseUpdate(schemaId, new GenericDatumReader[Any](msgSchema.rawSchema, subjectSchema.rawSchema))
     avroGenericMsg = avroReader.read(avroGenericMsg, avroBinaryDecoder)
-    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElseUpdate(schemaId, new AvroDeserializer(msgSchema.rawSchema, dataType, LegacyBehaviorPolicy.CORRECTED.toString))
+    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElseUpdate(schemaId, new AvroDeserializer(subjectSchema.rawSchema, dataType, LegacyBehaviorPolicy.CORRECTED.toString))
     avro2SparkDeserializer.deserialize(avroGenericMsg).orNull
   }
 
