@@ -21,7 +21,14 @@ import org.apache.hadoop.conf.Configuration
 import org.apache.spark.SparkConf
 import org.apache.spark.deploy.SparkHadoopUtil
 
+/**
+ * Make some private Spark methods available in SDLB.
+ */
 object PrivateAccessor {
+
+  /**
+   * Create a Hadoop Configuration with Spark properties applied on top.
+   */
   def getHadoopConfiguration(properties: Map[String,String]): Configuration = {
     val sparkConf = new SparkConf().setAll(properties)
     SparkHadoopUtil.get.newConfiguration(sparkConf)
