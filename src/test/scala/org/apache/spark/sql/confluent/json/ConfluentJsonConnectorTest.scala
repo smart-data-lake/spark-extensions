@@ -16,7 +16,7 @@ class ConfluentJsonConnectorTest extends AnyFunSuite with Logging {
   import spark.implicits._
 
   // test data
-  private val data1 = Seq(((true, "a"), 0f, "ok"))
+  private val data1 = Seq(((true, "a"), BigDecimal(0), "ok"))
   private val df1 = data1.toDF("a","c","d")
   private val schemaId1 = 1
 

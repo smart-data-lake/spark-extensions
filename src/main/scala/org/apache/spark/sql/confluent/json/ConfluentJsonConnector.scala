@@ -33,7 +33,7 @@ class ConfluentJsonConnector(confluentClient: ConfluentClient[JsonSchema]) exten
     val subject = confluentClient.getSubject(topic, subjectType)
     val (schemaId, schema) = confluentClient.getLatestSchemaFromConfluent(subject)
     val schemaJson = fromJsonNode(schema.toJsonNode).asInstanceOf[JObject]
-    val sparkSchema = JsonSchemaConverter.convertToSpark(schemaJson, isStrictTypingEnabled = false)
+    val sparkSchema = JsonSchemaConverter.convertParsedSchemaToSpark(schemaJson, isStrictTypingEnabled = false)
     functions.from_json(data.cast(StringType), sparkSchema)
   }
 

@@ -20,108 +20,103 @@
 package org.apache.spark.sql.confluent.json
 
 import org.apache.spark.sql.types._
-import org.json4s.{DefaultFormats, Formats, JObject}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
 
 import scala.io.Source
+import scala.util.Using
 
 /**
  * This code originates from https://github.com/zalando-incubator/spark-json-schema and is protected by its corresponding MIT license.
  */
 class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAfter {
 
-  val expectedStruct = StructType(Seq(
-    StructField("object", StructType(Seq(
-      StructField("item1", StringType, nullable = false),
-      StructField("item2", StringType, nullable = false)
-    )), nullable = false),
-    StructField("array", ArrayType(StructType(Seq(
-      StructField("itemProperty1", StringType, nullable = true),
-      StructField("itemProperty2", DoubleType, nullable = true)
-    )), containsNull = false), nullable = false),
-    StructField("structure", StructType(Seq(
-      StructField("nestedArray", ArrayType(StructType(Seq(
-        StructField("key", StringType, nullable = true),
-        StructField("value", LongType, nullable = true)
-      )), containsNull = false), nullable = true)
-    )), nullable = false),
-    StructField("integer", LongType, nullable = false),
-    StructField("string", StringType, nullable = false),
-    StructField("number", DoubleType, nullable = false),
-    StructField("nullable", DoubleType, nullable = true),
-    StructField("boolean", BooleanType, nullable = false),
-    StructField("additionalProperty", StringType, nullable = true),
-    StructField("map", MapType(StringType, DoubleType), nullable = true)
+  private val expectedStruct = StructType(Array(
+    StructField("object", StructType(Array(
+      StructField("item1", StringType),
+      StructField("item2", StringType)
+    ))),
+    StructField("array", ArrayType(StructType(Array(
+      StructField("itemProperty1", StringType),
+      StructField("itemProperty2", DecimalType(38,18))
+    )), containsNull = false)),
+    StructField("structure", StructType(Array(
+      StructField("nestedArray", ArrayType(StructType(Array(
+        StructField("key", StringType),
+        StructField("value", LongType)
+      )), containsNull = false))
+    ))),
+    StructField("integer", LongType),
+    StructField("string", StringType),
+    StructField("number", DecimalType(38,18)),
+    StructField("floatRequired", DoubleType, nullable = false),
+    StructField("nullable", DecimalType(38,18)),
+    StructField("booleanWithComment", BooleanType).withComment("todo"),
+    StructField("additionalProperty", StringType)
   ))
-  
-  private def convertToSparkStrict(schemaContent: String) = JsonSchemaConverter.convertToSpark(schemaContent, isStrictTypingEnabled = true)
-  private def convertToSparkNonStrict(schemaContent: String) = JsonSchemaConverter.convertToSpark(schemaContent, isStrictTypingEnabled = false)
+
+  private val jsonSparkTypeMap = Map(
+    "string" -> StringType,
+    "number" -> DecimalType(38,18),
+    "float" -> DoubleType,
+    "integer" -> LongType,
+    "boolean" -> BooleanType
+  )
 
   test("should convert schema.json into spark StructType") {
-    val testSchema = convertToSparkStrict(getTestResourceContent("/jsonSchema/testJsonSchemaVerbose.json"))
-    assert(testSchema === expectedStruct)
-  }
-
-  test("should convert schema.json content into spark StructType") {
-    val testSchema = convertToSparkStrict(getTestResourceContent("/jsonSchema/testJsonSchemaVerbose.json"))
+    val testSchema = JsonSchemaConverter.convertToSpark(getTestResourceContent("/jsonSchema/testJsonSchema.json"))
     assert(testSchema === expectedStruct)
   }
 
   // 'id' and 'name' are optional according to http://json-schema.org/latest/json-schema-core.html
-  test("json schema should support optional 'id' and 'name' properties") {
-    val testSchema = convertToSparkStrict(getTestResourceContent("/jsonSchema/testJsonSchemaSlim.json"))
-    assert(testSchema === StructType(expectedStruct.filterNot(_.name == "nullable")))
+  test("should support optional 'id' and 'name' properties") {
+    val testSchema = JsonSchemaConverter.convertToSpark(getTestResourceContent("/jsonSchema/testJsonSchema3.json"))
+    assert(testSchema === expectedStruct)
   }
 
-  test("json schema schema should support references") {
-    val schema = convertToSparkStrict(getTestResourceContent("/jsonSchema/testJsonSchemaRefs.json"))
+  test("schema should support references") {
+    val schema = JsonSchemaConverter.convertToSpark(getTestResourceContent("/jsonSchema/testJsonSchema4.json"))
 
     val expected = StructType(Array(
-      StructField("name", StringType, nullable = true),
+      StructField("name", StringType, nullable = false),
       StructField("addressA", StructType(Array(
         StructField("zip", StringType, nullable = true)
-      )), nullable = true),
+      )), nullable = false),
       StructField("addressB", StructType(Array(
         StructField("zip", StringType, nullable = true)
-      )), nullable = true)
+      )), nullable = false)
     ))
 
     assert(schema === expected)
   }
 
-  test("json schema empty object should be possible") {
-    val schema = convertToSparkStrict(
+  test("Empty object should be possible") {
+    val schema = JsonSchemaConverter.convertToSpark(
       """
         {
           "$schema": "smallTestSchema",
           "type": "object",
           "properties": {
             "address": {
-              "type": "object"
+              "type": "object",
+              "additionalProperties": true
             }
           }
         }
       """
     )
     val expected = StructType(Array(
-      StructField("address", StructType(Seq.empty), nullable = true)
+      StructField("address", MapType(StringType,StringType), nullable = true)
     ))
 
     assert(schema === expected)
   }
 
-  test("json schema known primitive type array should be an array of this type") {
-    val typeMap = Map(
-      "string" -> StringType,
-      "number" -> DoubleType,
-      "integer" -> LongType,
-      "boolean" -> BooleanType
-    )
-    typeMap.foreach {
+  test("Known primitive type array should be an array of this type") {
+    jsonSparkTypeMap.foreach {
       case p @ (key, datatype) =>
-        val schema = convertToSparkStrict(
+        val schema = JsonSchemaConverter.convertToSpark(
           s"""
           {
             "$$schema": "smallTestSchema",
@@ -145,8 +140,9 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     }
   }
 
-  test("json schema array of array should be an array of array") {
-    val schema = convertToSparkStrict(
+  test("Array of array should be an array of array") {
+
+    val schema = JsonSchemaConverter.convertToSpark(
       """
           {
             "$$schema": "smallTestSchema",
@@ -172,8 +168,9 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     assert(schema === expected)
   }
 
-  test("json schema array of object should be an array of object") {
-    val schema = convertToSparkStrict(
+  test("Array of object should be an array of object") {
+
+    val schema = JsonSchemaConverter.convertToSpark(
       """
           {
             "$$schema": "smallTestSchema",
@@ -182,7 +179,8 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
               "array" : {
                 "type" : "array",
                 "items": {
-                  "type": "object"
+                  "type": "object",
+                  "additionalProperties": true
                 }
               }
             }
@@ -190,14 +188,15 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
         """
     )
     val expected = StructType(Array(
-      StructField("array", ArrayType(StructType(Seq.empty), containsNull = false), nullable = true)
+      StructField("array", ArrayType(MapType(StringType, StringType), containsNull = false), nullable = true)
     ))
 
     assert(schema === expected)
   }
 
-  test("json schema array of object with properties should be an array of object with these properties") {
-    val schema = convertToSparkStrict(
+  test("Array of object with properties should be an array of object with these properties") {
+
+    val schema = JsonSchemaConverter.convertToSpark(
       """
           {
             "$$schema": "smallTestSchema",
@@ -225,9 +224,10 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     assert(schema === expected)
   }
 
-  test("json schema array of unknown type should fail") {
-    assertThrows[IllegalArgumentException] {
-      val schema = convertToSparkStrict(
+  test("Array of unknown type should fail") {
+
+    assertThrows[IllegalStateException] {
+      val schema = JsonSchemaConverter.convertToSpark(
         """
           {
             "$$schema": "smallTestSchema",
@@ -244,37 +244,72 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     }
   }
 
-  test("json schema array of various type should fail") {
-    assertThrows[IllegalArgumentException] {
-      val schema = convertToSparkStrict(
-        """
-          {
-            "$$schema": "smallTestSchema",
-            "type": "object",
-            "properties": {
-              "array" : {
-                "type" : "array",
-                "items" : {
-                  "type" : ["string", "integer"]
-                }
+  test("Array of various type should be merged") {
+    val schema = JsonSchemaConverter.convertToSpark(
+      """
+        {
+          "$$schema": "smallTestSchema",
+          "type": "object",
+          "properties": {
+            "array" : {
+              "type" : "array",
+              "items" : {
+                "type" : ["string", "integer"]
               }
             }
           }
-        """
-      )
-    }
+        }
+      """
+    )
+    val expected = StructType(Array(
+      StructField("array", ArrayType(StringType, containsNull = false), nullable = true)
+    ))
+
+    assert(schema === expected)
   }
 
-  test("json schema array of nullable type should be an array of nullable type") {
-    val typeMap = Map(
-      "string" -> StringType,
-      "number" -> DoubleType,
-      "integer" -> LongType,
-      "boolean" -> BooleanType
+  test("Array of various object type should be merged") {
+    val schema = JsonSchemaConverter.convertToSpark(
+      """
+      {
+        "$$schema": "smallTestSchema",
+        "type": "object",
+        "properties": {
+          "array" : {
+            "type" : "array",
+            "items" : {
+              "type" : [{
+                  "type": "object",
+                  "properties" : {
+                    "prop1" : {
+                      "type" : "string"
+                    }
+                  }
+                }, {
+                  "type": "object",
+                  "properties" : {
+                    "prop2" : {
+                      "type" : "string"
+                    }
+                  }
+                }]
+            }
+          }
+        }
+      }
+    """
     )
-    typeMap.foreach {
+    val expected = StructType(Array(
+      StructField("array", ArrayType(StructType(Seq(StructField("prop1",StringType),StructField("prop2",StringType))), containsNull = false), nullable = true)
+    ))
+
+    assert(schema === expected)
+  }
+
+  test("Array of nullable type should be an array of nullable type") {
+    jsonSparkTypeMap.foreach {
       case (name, atype) =>
-        val schema = convertToSparkStrict(
+        val schema = JsonSchemaConverter.convertToSpark(
           s"""
           {
             "$$schema": "smallTestSchema",
@@ -292,15 +327,15 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
         )
 
         val expected = StructType(Array(
-          StructField("array", ArrayType(atype, containsNull = true), nullable = true)
+          StructField("array", ArrayType(atype, containsNull = true))
         ))
 
         assert(schema === expected)
     }
   }
 
-  test("json schema array of non-nullable type should be an array of non-nullable type") {
-    val schema = convertToSparkStrict(
+  test("Array of non-nullable type should be an array of non-nullable type") {
+    val schema = JsonSchemaConverter.convertToSpark(
       """
           {
             "$$schema": "smallTestSchema",
@@ -318,14 +353,14 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     )
 
     val expected = StructType(Array(
-      StructField("array", ArrayType(StringType, containsNull = false), nullable = true)
+      StructField("array", ArrayType(StringType, containsNull = false))
     ))
 
     assert(schema === expected)
   }
 
-  test("json schema array of nullable object should be an array of nullable object") {
-    val schema = convertToSparkStrict(
+  test("Array of nullable object should be an array of nullable object") {
+    val schema = JsonSchemaConverter.convertToSpark(
       """
           {
             "$$schema": "smallTestSchema",
@@ -339,7 +374,8 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
                     "prop" : {
                       "type" : "string"
                     }
-                  }
+                  },
+                  "required": ["prop"]
                 }
               }
             }
@@ -349,15 +385,15 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
 
     val expected = StructType(Array(
       StructField("array", ArrayType(
-        StructType(Seq(StructField("prop", StringType, nullable = true))), containsNull = true
-      ), nullable = true)
+        StructType(Seq(StructField("prop", StringType, nullable = false))), containsNull = true
+      ))
     ))
 
     assert(schema === expected)
   }
 
-  test("json schema nullable array should be an array or a null value") {
-    val schema = convertToSparkStrict(
+  test("Nullable array should be an array or a null value") {
+    val schema = JsonSchemaConverter.convertToSpark(
       """
           {
             "$$schema": "smallTestSchema",
@@ -381,9 +417,9 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     assert(schema === expected)
   }
 
-  test("json schema multiple types should fail with strict typing") {
+  test("Multiple types should fail with strict typing") {
     assertThrows[IllegalArgumentException] {
-      val schema = convertToSparkStrict(
+      val schema = JsonSchemaConverter.convertToSpark(
         """
           {
             "$$schema": "smallTestSchema",
@@ -400,8 +436,8 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     }
   }
 
-  test("json schema multiple types should default to string without strict typing") {
-    val schema = convertToSparkNonStrict(
+  test("Multiple types should default to string without strict typing") {
+    val schema = JsonSchemaConverter.convertToSpark(
       """
           {
             "$$schema": "smallTestSchema",
@@ -410,21 +446,24 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
               "prop" : {
                 "type" : ["integer", "float"]
               }
-            }
+            },
+            "required": ["prop"],
+            "additionalProperties": false
           }
-        """
+        """,
+      isStrictTypingEnabled = false
     )
 
     val expected = StructType(Array(
-      StructField("prop", StringType, nullable = true)
+      StructField("prop", StringType, nullable = false)
     ))
 
     assert(schema === expected)
   }
 
-  test("json schema null type only should fail") {
+  test("null type only should fail") {
     assertThrows[NoSuchElementException] {
-      val schema = convertToSparkStrict(
+      val schema = JsonSchemaConverter.convertToSpark(
         """
           {
             "$$schema": "smallTestSchema",
@@ -440,9 +479,9 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     }
   }
 
-  test("json schema null type only should fail event as a single array element") {
+  test("null type only should fail event as a single array element") {
     assertThrows[IllegalArgumentException] {
-      val schema = convertToSparkStrict(
+      val schema = JsonSchemaConverter.convertToSpark(
         """
           {
             "$$schema": "smallTestSchema",
@@ -458,37 +497,39 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     }
   }
 
-  test("json schema should support creating map from additionalProperties") {
-    val schema = convertToSparkStrict(getTestResourceContent("/jsonSchema/testJsonSchemaMap.json"))
 
-    val expected = StructType(Array(
-      StructField("strictMap", MapType(StringType, DoubleType), nullable = true),
-      StructField("nonStrictMap", MapType(StringType, StringType), nullable = true),
-    ))
+  test("Object with oneOf type should be merged") {
+    val schema = JsonSchemaConverter.convertToSpark(
+      """
+        {
+          "$$schema": "smallTestSchema",
+          "oneOf": [{
+            "type": "object",
+            "properties" : {
+              "prop1" : {
+                "type" : "string"
+              }
+            }
+          }, {
+            "type": "object",
+            "properties" : {
+              "prop2" : {
+                "type" : "string"
+              }
+            },
+            "required": ["prop2"]
+          }]
+        }
+      """
+    )
+    val expected = StructType(Seq(StructField("prop1", StringType), StructField("prop2", StringType)))
 
     assert(schema === expected)
   }
 
-  test("slim json schema converted to spark and back should be equal") {
-    import org.json4s.jackson.JsonMethods._
-    implicit val format: Formats = DefaultFormats
-    val originalJsonSchemaContent = getTestResourceContent("/jsonSchema/testJsonSchemaSlim.json")
-    val originalJsonSchema = parse(originalJsonSchemaContent).extract[JObject]
-
-    val sparkSchema = JsonSchemaConverter.convertToSpark(originalJsonSchema, true)
-    val restoredJsonSchema = JsonSchemaConverter.convertFromSpark(sparkSchema)
-
-    assert(restoredJsonSchema == originalJsonSchema)
-  }
-
-
   def getTestResourceContent(relativePath: String): String = {
     Option(getClass.getResource(relativePath)) match {
-      case Some(relPath) =>
-        val src = Source.fromURL(relPath)
-        val content = src.mkString
-        src.close
-        content
+      case Some(relPath) => Using.resource(Source.fromURL(relPath))(_.mkString)
       case None => throw new IllegalArgumentException(s"Path can not be reached: $relativePath")
     }
   }
