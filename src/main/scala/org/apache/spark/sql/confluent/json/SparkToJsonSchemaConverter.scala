@@ -32,20 +32,20 @@ private case class JSchemaBasicType(override val tpe: String) extends JsonSchema
 private case class JSchemaArray(items: JsonSchemaEntry) extends JsonSchemaEntry {
   override val tpe: String = "array"
   override def toJson: JObject = {
-    JObject(super.toJson.obj :+ JField(SchemaArrayItems, items.toJson))
+    JObject(super.toJson.obj :+ JField(SchemaFieldItems, items.toJson))
   }
 }
 private case class JSchemaObject(properties: Map[String,JsonSchemaEntry], required: Seq[String], additionalProperties: Boolean = false) extends JsonSchemaEntry {
   override val tpe: String = "object"
   override def toJson: JObject = {
     val propertiesFields = properties.toSeq.map { case (name, tpe) => JField(name, tpe.toJson) }
-    val requiredField = if (required.nonEmpty) Some(JField(SchemaObjectPropertiesRequired, JArray(required.map(f => JString(f)).toList))) else None
-    JObject((super.toJson.obj :+ JField(SchemaObjectProperties, JObject(propertiesFields: _*))) ++ requiredField :+ JField(SchemaAdditionalProperties, JBool.apply(additionalProperties)))
+    val requiredField = if (required.nonEmpty) Some(JField(SchemaFieldRequired, JArray(required.map(f => JString(f)).toList))) else None
+    JObject((super.toJson.obj :+ JField(SchemaFieldProperties, JObject(propertiesFields: _*))) ++ requiredField :+ JField(SchemaFieldAdditionalProperties, JBool.apply(additionalProperties)))
   }
 }
 private case class JSchemaMap(valueTpe: JsonSchemaEntry) extends JsonSchemaEntry {
   override val tpe: String = "object" // we model this as type=object with 'additionalProperties' set
   override def toJson: JObject = {
-    JObject(super.toJson.obj :+ JField(SchemaAdditionalProperties, valueTpe.toJson))
+    JObject(super.toJson.obj :+ JField(SchemaFieldAdditionalProperties, valueTpe.toJson))
   }
 }
