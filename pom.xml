@@ -19,7 +19,7 @@
 
 	<groupId>io.smartdatalake</groupId>
 	<artifactId>spark-extensions_${scala.minor.version}</artifactId>
-	<version>3.4.3</version>
+	<version>3.4.4-SNAPSHOT</version>
 	<packaging>jar</packaging>
 
 	<licenses>
