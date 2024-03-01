@@ -25,7 +25,7 @@ import scala.annotation.tailrec
  * A field can be null if its type is a 2-element array, one of which is "null". The converted
  * schema doesn't check for 'enum' fields, i.e. fields which are limited to a given set.
  * It also doesn't check for required fields.
- * If a field is specified in the schema, than you can select it and it will
+ * If a field is specified in the schema, then you can select it and it will
  * be null if missing. If a field is not in the schema, it cannot be selected even if
  * given in the dataset.
  *
