@@ -33,24 +33,26 @@ class XsdSchemaConverterTest extends AnyFunSuite {
     val xsdContent = Source.fromResource("xmlSchema/complex.xsd").mkString
     val schema = XsdSchemaConverter.read(xsdContent, 3)
     // nested lists
-    val nodeArrayType = extractSubDataType(schema, "node").map(_.asInstanceOf[ArrayType]).get
-    val nodeStructType = nodeArrayType.elementType.asInstanceOf[StructType]
+    val nodeModifiedArrayType = getNestedElement(schema, Seq("tree","nodes","modified","node")).asInstanceOf[ArrayType]
+    val nodeModifiedStructType = nodeModifiedArrayType.elementType.asInstanceOf[StructType]
     // attributeGroup
-    assert(nodeStructType.fieldNames.contains("_validFrom"))
+    assert(nodeModifiedStructType.fieldNames.contains("_validFrom"))
     // recursion
-    assert(nodeStructType.fieldNames.toSeq == nodeStructType("nodes").dataType.asInstanceOf[StructType]("node").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType].fieldNames.toSeq)
+    assert(nodeModifiedStructType.fieldNames.toSeq == nodeModifiedStructType("nodes").dataType.asInstanceOf[StructType]("node").dataType.asInstanceOf[ArrayType].elementType.asInstanceOf[StructType].fieldNames.toSeq)
     // documentation
-    nodeStructType("_nodeType").getComment().contains("Test Documentation")
+    nodeModifiedStructType("_nodeType").getComment().contains("Test Documentation")
+    // ref
+    val nodeDeletedArrayType = getNestedElement(schema, Seq("tree","nodes","deleted","node")).asInstanceOf[ArrayType]
+    val nodeDeletedStructType = nodeDeletedArrayType.elementType.asInstanceOf[StructType]
+    assert(nodeDeletedStructType.fieldNames.contains("comment"))
+    assert(nodeDeletedStructType("comment").nullable)
   }
 
-  def extractSubDataType(schema: StructType, elementName: String): Option[DataType] = {
-    schema.fields.find(_.name == elementName).map(_.dataType)
-      .orElse {
-        val structFields = schema.fields.map(_.dataType).collect{
-          case x: StructType => x
-          case x: ArrayType if x.elementType.isInstanceOf[StructType] => x.elementType.asInstanceOf[StructType]
-        }
-        structFields.flatMap(x => extractSubDataType(x, elementName)).headOption
-      }
+  def getNestedElement(schema: StructType, path: Seq[String]): DataType = {
+    path.foldLeft[DataType](schema) {
+      case (schema: StructType, fieldName) =>
+        schema.find(_.name == fieldName).getOrElse(throw new Exception(s"field $fieldName not found in ${schema.fieldNames.mkString(",")}")).dataType
+      case (dataType, fieldName) => throw new Exception(s"Cannot extract field $fieldName from non-StructType $dataType")
+    }
   }
 }
