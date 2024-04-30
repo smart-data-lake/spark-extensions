@@ -198,17 +198,17 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
         }.toSeq
       // xs:all
       case all: XmlSchemaAll =>
-        all.getItems.asScala.map(resolveRef).flatMap{
+        all.getItems.asScala.toSeq.map(resolveRef).flatMap{
           case p: XmlSchemaParticle => mapParticle(p, path, Some(all.getMaxOccurs))
         }
       // xs:choice
       case choice: XmlSchemaChoice =>
-        choice.getItems.asScala.map(resolveRef).flatMap {
+        choice.getItems.asScala.toSeq.map(resolveRef).flatMap {
           case p: XmlSchemaParticle => mapParticle(p, path, Some(choice.getMaxOccurs))
         }
       // xs:sequence
       case sequence: XmlSchemaSequence =>
-        sequence.getItems.asScala.map(resolveRef).flatMap{
+        sequence.getItems.asScala.toSeq.map(resolveRef).flatMap{
           case p: XmlSchemaParticle => mapParticle(p, path, Some(sequence.getMaxOccurs))
         }
       case any: XmlSchemaAny =>
