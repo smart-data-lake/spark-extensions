@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  ~ Smart Data Lake - Build your data lake the smart way.
+  ~
+  ~ Copyright © 2019-2022 ELCA Informatique SA (<https://www.elca.ch>)
+  ~
+  ~ This program is free software: you can redistribute it and/or modify
+  ~ it under the terms of the GNU General Public License as published by
+  ~ the Free Software Foundation, either version 3 of the License, or
+  ~ (at your option) any later version.
+  ~
+  ~ This program is distributed in the hope that it will be useful,
+  ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
+  ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  ~ GNU General Public License for more details.
+  ~
+  ~ You should have received a copy of the GNU General Public License
+  ~ along with this program. If not, see <http://www.gnu.org/licenses/>.
+  -->
+<!--
+  This schema includes the following complex techniques for testing
+  - Nested lists
+  -->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+    <xs:element name="element1" type="type1"/>
+    <xs:complexType name="type1" >
+        <xs:complexContent>
+            <xs:extension base="type2">
+                <xs:sequence>
+                    <xs:element name="a" type="xs:string"/>
+                    <xs:element name="b" type="xs:string"/>
+                </xs:sequence>
+                <xs:attribute name="a1" type="xs:string"/>
+            </xs:extension>
+        </xs:complexContent>
+    </xs:complexType>
+    <xs:complexType name="type2">
+        <xs:sequence>
+            <xs:element name="c" type="xs:string"/>
+        </xs:sequence>
+        <xs:attribute name="a2" type="xs:string"/>
+    </xs:complexType>
+</xs:schema>
