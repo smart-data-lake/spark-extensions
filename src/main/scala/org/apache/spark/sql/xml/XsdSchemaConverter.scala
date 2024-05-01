@@ -155,7 +155,7 @@ class XsdSchemaConverter(xmlSchema: XmlSchema, maxRecursion: Int) {
                 val baseFields = baseField.map(_.dataType).map {
                   case StructType(fields) => fields.toSeq
                 }.getOrElse(Seq())
-                val childFields = mapParticle(complexType.getParticle, path :+ complexType.getName)
+                val childFields = mapParticle(extension.getParticle, path :+ complexType.getName)
                 val attributes = mapAttributes(complexType.getAttributes.asScala.toSeq ++ extension.getAttributes.asScala, path)
                 val fields = baseFields ++ childFields ++ attributes
                 if (fields.nonEmpty) Some(addComment(StructField(complexType.getName, StructType(fields)), complexType))
