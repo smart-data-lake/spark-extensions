@@ -48,6 +48,12 @@ class XsdSchemaConverterTest extends AnyFunSuite {
     assert(nodeDeletedStructType("comment").nullable)
   }
 
+  test("read fields from basetype and extension") {
+    val xsdContent = Source.fromResource("xmlSchema/nestedTypes.xsd").mkString
+    val schema = XsdSchemaConverter.read(xsdContent, 10)
+    assert(schema.apply("element1").dataType.asInstanceOf[StructType].fieldNames.toSet == Set("a","b","c","_a1","_a2"))
+  }
+
   def getNestedElement(schema: StructType, path: Seq[String]): DataType = {
     path.foldLeft[DataType](schema) {
       case (schema: StructType, fieldName) =>
