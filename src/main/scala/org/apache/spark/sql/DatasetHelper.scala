@@ -20,6 +20,7 @@ package org.apache.spark.sql
 import org.apache.spark.SparkEnv
 import org.apache.spark.rdd.BlockRDD
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.storage.{StorageLevel, TempLocalBlockId}
 
@@ -58,4 +59,10 @@ object DatasetHelper {
     session.internalCreateDataFrame(rdd, schema)
   }
 
+  /**
+   * Manipulate Logical Plan of a DataFrame
+   * */
+  def modifyPlan(df: DataFrame, fun: LogicalPlan => LogicalPlan): DataFrame = {
+    Dataset.ofRows(df.sparkSession, fun(df.logicalPlan))
+  }
 }
