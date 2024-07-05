@@ -151,8 +151,8 @@
 		<scala.minor.version>2.12</scala.minor.version>
 		<scala.version>${scala.minor.version}.17</scala.version>
 
-		<spark.version>3.5.0</spark.version>
-		<confluent.version>7.5.1</confluent.version>
+		<spark.version>3.5.1</spark.version>
+		<confluent.version>7.6.0</confluent.version>
 		<jackson.version>2.15.2</jackson.version>
 		<scalatest.version>3.2.2</scalatest.version>
 		<slf4j.version>2.0.7</slf4j.version>
