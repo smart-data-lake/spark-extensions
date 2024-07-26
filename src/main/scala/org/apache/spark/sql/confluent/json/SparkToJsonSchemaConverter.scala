@@ -2,9 +2,9 @@ package org.apache.spark.sql.confluent.json
 
 import org.apache.spark.sql.confluent.IncompatibleSchemaException
 import org.apache.spark.sql.confluent.json.JsonSchemaConverter._
-import org.apache.spark.sql.types.{ArrayType, DataType, DecimalType, MapType, StringType, StructType}
-import org.json4s.{JArray, JObject, JString, JValue}
+import org.apache.spark.sql.types._
 import org.json4s.JsonAST.{JBool, JField}
+import org.json4s.{JArray, JObject, JString}
 
 object SparkToJsonSchemaConverter {
   def convert(schema: StructType): JObject = {
