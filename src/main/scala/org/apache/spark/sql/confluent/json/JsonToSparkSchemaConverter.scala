@@ -47,7 +47,6 @@ class JsonToSparkSchemaConverter(inputSchema: JValue,
                                 ) {
   implicit val format: Formats = DefaultFormats
 
-  // in the spec the $ref attribute needs a path including "definitions", but the lookup is done against "/definition/..."
   lazy val definitions: JObject = (inputSchema \ definitionsPath).extractOpt[JObject]
     .getOrElse(JObject())
 
