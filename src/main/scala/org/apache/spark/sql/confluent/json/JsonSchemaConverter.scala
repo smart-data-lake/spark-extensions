@@ -26,7 +26,10 @@ object JsonSchemaConverter {
     "string" -> StringType,
     "number" -> DecimalType.SYSTEM_DEFAULT,
     "float" -> DoubleType,
+    "double" -> DoubleType,
     "integer" -> LongType,
+    "int32" -> IntegerType,
+    "int64" -> LongType,
     "boolean" -> BooleanType,
     "date-time" -> TimestampType,
     "date-time-ntz" -> TimestampNTZType,
@@ -56,7 +59,12 @@ object JsonSchemaConverter {
   }
 
   def convertParsedSchemaToSpark(schema: JObject, isStrictTypingEnabled: Boolean = true, additionalPropertiesDefault: Boolean = true): StructType = {
-    new JsonToSparkSchemaConverter(schema, isStrictTypingEnabled, additionalPropertiesDefault).convert()
+    convertParsedSchemaToSparkDataType(schema, isStrictTypingEnabled, additionalPropertiesDefault)
+      .asInstanceOf[StructType]
+  }
+
+  def convertParsedSchemaToSparkDataType(schema: JValue, isStrictTypingEnabled: Boolean = true, additionalPropertiesDefault: Boolean = true, definitionsPath: String = Definitions): DataType = {
+    new JsonToSparkSchemaConverter(schema, isStrictTypingEnabled, additionalPropertiesDefault, definitionsPath).convert()
   }
 
   def convertFromSpark(schema: StructType): JObject = {

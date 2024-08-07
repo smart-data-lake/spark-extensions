@@ -31,24 +31,29 @@ import scala.annotation.tailrec
  *
  * @param inputSchema                 The Json schema to convert
  * @param isStrictTypingEnabled       if isStrictTypingEnabled=true:
- *                              - union types (oneOf) are merged if rational, otherwise they are simply mapped to StringType
- *                              - additional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String)
+ *                                    - union types (oneOf) are merged if rational, otherwise they are simply mapped to StringType
+ *                                    - additional properties are ignored, otherwise the corresponding schema object is mapped to MapType(String,String)
  * @param additionalPropertiesDefault This is the default value for 'additionalProperties'-field if it is missing in a schema with type='object'.
  *                                    Default value is additionalPropertiesDefault=true, as this is conform with the specification.
+ * @param definitionsPath             Path in schema to look for Definitions. Definitions are needed to resolve references.
+ *                                    See also https://cswr.github.io/JsonSchema/spec/definitions_references/.
+ *                                    Default is "definitions", but for OpenAPI Spec this has to be "components", see also https://swagger.io/docs/specification/components/.
  *
  */
-class JsonToSparkSchemaConverter(inputSchema: JObject,
+class JsonToSparkSchemaConverter(inputSchema: JValue,
                                  isStrictTypingEnabled: Boolean = true,
-                                 additionalPropertiesDefault: Boolean = true
+                                 additionalPropertiesDefault: Boolean = true,
+                                 definitionsPath: String = Definitions
                                 ) {
   implicit val format: Formats = DefaultFormats
 
-  lazy val definitions: JObject = (inputSchema \ Definitions).extractOpt[JObject].getOrElse(definitions)
+  lazy val definitions: JObject = (inputSchema \ definitionsPath).extractOpt[JObject]
+    .getOrElse(JObject())
 
-  def convert(): StructType = {
+  def convert(): DataType = {
     val name = getJsonName(inputSchema).getOrElse(SchemaRoot)
     val schemaType = convertAnyType(inputSchema, name)
-    schemaType.dataType.asInstanceOf[StructType]
+    schemaType.dataType
   }
 
   private def getJsonName(json: JValue): Option[String] = (json \ SchemaFieldName).extractOpt[String]
@@ -111,8 +116,8 @@ class JsonToSparkSchemaConverter(inputSchema: JObject,
     JObject(List(
       JField(SchemaFieldType, mergedType),
       JField(SchemaFieldProperties, (obj1 \ SchemaFieldProperties).merge(obj2 \ SchemaFieldProperties)),
-      JField(SchemaFieldRequired, JArray(List((obj1 \ SchemaFieldRequired).extractOpt[Seq[String]], (obj2 \ SchemaFieldRequired).extractOpt[Seq[String]]).flatten.reduce(_ intersect _).map(JString).toList)),
-      JField(SchemaFieldAdditionalProperties, JBool(Seq((obj1 \ SchemaFieldAdditionalProperties).extractOpt[Boolean], (obj2 \ SchemaFieldAdditionalProperties).extractOpt[Boolean], Some(false)).flatten.reduce(_ || _))),
+      JField(SchemaFieldRequired, JArray(List((obj1 \ SchemaFieldRequired).extractOpt[Seq[String]], (obj2 \ SchemaFieldRequired).extractOpt[Seq[String]]).flatten.reduceLeft(_ intersect _).map(JString).toList)),
+      JField(SchemaFieldAdditionalProperties, JBool(Seq((obj1 \ SchemaFieldAdditionalProperties).extractOpt[Boolean], (obj2 \ SchemaFieldAdditionalProperties).extractOpt[Boolean], Some(false)).flatten.reduceLeft(_ || _))),
     ))
   }
 
@@ -129,7 +134,7 @@ class JsonToSparkSchemaConverter(inputSchema: JObject,
       case JArray(arr) => arr
       case x => Seq(x)
     }
-    val mergedItems = (items1 ++ items2).reduce(mergeTypes(name))
+    val mergedItems = (items1 ++ items2).reduceLeft(mergeTypes(name))
     val mergedType = if (type1.nullable || type2.nullable) JArray(List(JString("array"), JString("null"))) else JString("array")
     JObject(List(
       JField(SchemaFieldType, mergedType),
@@ -137,27 +142,35 @@ class JsonToSparkSchemaConverter(inputSchema: JObject,
     ))
   }
 
+  private def resolveRefsIfObj(json: JValue) = {
+    json match {
+      case jsonObj: JObject => resolveRefs(jsonObj)
+      case _ => json
+    }
+  }
+
   private def mergeTypes(name: String)(jsonType1: JValue, jsonType2: JValue): JValue = {
-    assert(jsonType1.toString < jsonType2.toString, "input must be sorted and unique")
-    val type1 = extractType(jsonType1, name).json
-    val type2 = extractType(jsonType2, name).json
-    (type1, type2) match {
-      case (JString("object"), JString("object")) =>
-        mergeObjectTypes(jsonType1.asInstanceOf[JObject], jsonType2.asInstanceOf[JObject], name)
-      case (JString("object"), _) | (_, JString("object")) =>
-        if (isStrictTypingEnabled) throw new IllegalArgumentException(s"Cannot unify types <$jsonType1> and <$type2> in schema at <$name>")
+    val resolvedType1 = resolveRefsIfObj(jsonType1)
+    val resolvedType2 = resolveRefsIfObj(jsonType2)
+    val type1 = extractType(resolvedType1, name).json
+    val type2 = extractType(resolvedType2, name).json
+    Seq(type1, type2).sortBy(_.toString) match {
+      case Seq(JString("object"), JString("object")) =>
+        mergeObjectTypes(resolvedType1.asInstanceOf[JObject], resolvedType2.asInstanceOf[JObject], name)
+      case Seq(JString("object"), _) | Seq(_, JString("object")) =>
+        if (isStrictTypingEnabled) throw new IllegalArgumentException(s"Cannot unify types <$resolvedType1> and <$resolvedType2> in schema at <$name>")
         else JString("string")
-      case (JString("array"), JString("array")) =>
-        mergeArrayTypes(jsonType1.asInstanceOf[JObject], jsonType2.asInstanceOf[JObject], name)
-      case (JString("array"), _) | (_, JString("array")) =>
-        if (isStrictTypingEnabled) throw new IllegalArgumentException(s"Cannot unify types <$jsonType1> and <$type2> in schema at <$name>")
+      case Seq(JString("array"), JString("array")) =>
+        mergeArrayTypes(resolvedType1.asInstanceOf[JObject], resolvedType2.asInstanceOf[JObject], name)
+      case Seq(JString("array"), _) | Seq(_, JString("array")) =>
+        if (isStrictTypingEnabled) throw new IllegalArgumentException(s"Cannot unify types <$resolvedType1> and <$resolvedType2> in schema at <$name>")
         else JString("string")
-      case (JString("string"), _) | (_, JString("string")) => JString("string")
-      case (JString("float"), JString("number")) => JString("number")
-      case (JString("integer"), JString("number")) => JString("number")
-      case (JString("integer"), JString("float")) => JString("number")
+      case Seq(JString("string"), _) | Seq(_, JString("string")) => JString("string")
+      case Seq(JString("float"), JString("number")) => JString("number")
+      case Seq(JString("integer"), JString("number")) => JString("number")
+      case Seq(JString("integer"), JString("float")) => JString("number")
       case _ =>
-        if (isStrictTypingEnabled) throw new IllegalArgumentException(s"Cannot unify types <$jsonType1> and <$jsonType2> in schema at <$name>")
+        if (isStrictTypingEnabled) throw new IllegalArgumentException(s"Cannot unify types <$resolvedType1> and <$resolvedType2> in schema at <$name>")
         else JString("string")
     }
   }
@@ -176,7 +189,7 @@ class JsonToSparkSchemaConverter(inputSchema: JObject,
           .map(jsonType => NullableType(jsonType, nullable = true))
           .getOrElse(throw new IllegalArgumentException(s"Incorrect definition of a nullable parameter at <$name>"))
       case _ =>
-        NullableType(array.filter(_ != JString("null")).distinct.sortBy(_.toString).reduce(mergeTypes(name)), nullable)
+        NullableType(array.filter(_ != JString("null")).distinct.reduceLeft(mergeTypes(name)), nullable)
     }
   }
 
@@ -209,7 +222,8 @@ class JsonToSparkSchemaConverter(inputSchema: JObject,
     jsonType match {
       case JString("object") => convertJsonObject(jsonObj, name, nullable)
       case JString("array") => convertJsonArray(jsonObj, name, nullable)
-      case JString(str) => SchemaType(JsonToSparkTypeMap(str.trim), nullable)
+      case JString(str) if str=="null" => throw new IllegalArgumentException(s"type of object is 'null' at <$name>")
+      case JString(str) => SchemaType(JsonToSparkTypeMap.getOrElse(str.trim.toLowerCase, StringType), nullable)
     }
   }
 
@@ -217,7 +231,7 @@ class JsonToSparkSchemaConverter(inputSchema: JObject,
     val resolvedName = getJsonId(json).getOrElse(name)
     val jsonType = extractType(json, resolvedName)
     json match {
-      case JString(str) => SchemaType(JsonToSparkTypeMap(str.trim), jsonType.nullable || nullable)
+      case JString(str) => SchemaType(JsonToSparkTypeMap.getOrElse(str.trim.toLowerCase, StringType), jsonType.nullable || nullable)
       case JObject(entries) if entries.isEmpty && isStrictTypingEnabled =>
         throw new IllegalStateException(s"type is empty in schema at $resolvedName")
       case _: JArray => convertAnyType(jsonType.json, name, jsonType.nullable || nullable)
@@ -236,18 +250,18 @@ class JsonToSparkSchemaConverter(inputSchema: JObject,
     val schemaRef = (inputJson \ Reference).extractOpt[String]
     schemaRef match {
       case Some(loc) =>
-        val searchDefinitions = Definitions + "/"
+        val searchDefinitions = definitionsPath + "/"
         val defIndex = loc.indexOf(searchDefinitions) match {
           case -1 => throw new NoSuchElementException(
-            s"Field with name [$Reference] requires path with [$searchDefinitions]"
+            s"Field with name [$Reference] requires path with path element '[$searchDefinitions]'"
           )
           case i: Int => i + searchDefinitions.length
         }
         val pathNodes = loc.drop(defIndex).split("/").toList
         val definition = pathNodes.foldLeft(definitions: JValue) { case (obj, node) => obj \ node } match {
           case obj: JObject => obj
-          case JNothing => throw new NoSuchElementException(s"Path [$loc] not found in $Definitions")
-          case _ => throw new NoSuchElementException(s"Path [$loc] in $Definitions is not of type object")
+          case JNothing => throw new NoSuchElementException(s"Path [$loc] not found in $definitionsPath")
+          case x => throw new NoSuchElementException(s"Path [$loc] in $definitionsPath is of type ${x.getClass.getSimpleName} instead JObject")
         }
         definition
       case None => inputJson

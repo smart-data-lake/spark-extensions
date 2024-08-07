@@ -20,6 +20,8 @@
 package org.apache.spark.sql.confluent.json
 
 import org.apache.spark.sql.types._
+import org.json4s.JObject
+import org.json4s.JsonAST.{JField, JString}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatest.matchers.should.Matchers
@@ -462,7 +464,7 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
   }
 
   test("null type only should fail") {
-    assertThrows[NoSuchElementException] {
+    assertThrows[IllegalArgumentException] {
       val schema = JsonSchemaConverter.convertToSpark(
         """
           {
@@ -476,6 +478,7 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
           }
         """
       )
+      println(schema)
     }
   }
 
@@ -526,6 +529,86 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
 
     assert(schema === expected)
   }
+
+
+  test("Schema referencing definition in oneOf") {
+    val schema = JsonSchemaConverter.convertToSpark(
+      """
+        {
+          "$$schema": "smallTestSchema",
+          "oneOf": [{
+            "type": "object",
+            "properties" : {
+              "prop1" : {
+                "type" : "string"
+              }
+            }
+          }, {
+            "$ref": "#/definitions/obj2"
+          }],
+          "definitions": {
+            "obj2": {
+              "type": "object",
+              "properties" : {
+                "prop2" : {
+                  "type" : "string"
+                }
+              },
+              "required": ["prop2"]
+            }
+          }
+        }
+      """
+    )
+    val expected = StructType(Seq(StructField("prop1", StringType), StructField("prop2", StringType)))
+
+    assert(schema === expected)
+  }
+
+  test("Schema referencing definition") {
+    val schema = JsonSchemaConverter.convertToSpark(
+      """
+        {
+          "$$schema": "smallTestSchema",
+          "type": "object",
+          "properties" : {
+            "prop1" : {
+              "$ref": "definitions/obj1"
+            }
+          },
+          "definitions": {
+            "obj1": {
+              "type": "object",
+              "properties" : {
+                "propA" : {
+                  "type" : "string"
+                }
+              },
+              "required": ["propA"]
+            }
+          }
+        }
+      """
+    )
+    val expected = StructType(Seq(StructField("prop1", StructType(Seq(StructField("propA", StringType, nullable = false))))))
+
+    assert(schema === expected)
+  }
+
+  test("Parse simple string type") {
+    val schema = JsonSchemaConverter.convertParsedSchemaToSparkDataType(JString("string"))
+    val expected = StringType
+    assert(schema === expected)
+  }
+
+  test("Parse simple array type") {
+    val schema = JsonSchemaConverter.convertParsedSchemaToSparkDataType(
+      JObject(List(JField("type", JString("array")), JField("items", JString("string"))))
+    )
+    val expected = ArrayType(StringType, containsNull = false)
+    assert(schema === expected)
+  }
+
 
   def getTestResourceContent(relativePath: String): String = {
     Option(getClass.getResource(relativePath)) match {
