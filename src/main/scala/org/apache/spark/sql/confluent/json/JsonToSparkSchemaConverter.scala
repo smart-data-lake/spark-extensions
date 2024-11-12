@@ -197,7 +197,8 @@ class JsonToSparkSchemaConverter(inputSchema: JValue,
   private def extractType(json: JValue, name: String): NullableType = json match {
     case str: JString => NullableType(str, nullable = false)
     case JObject(entries) if entries.isEmpty && isStrictTypingEnabled =>
-      throw new IllegalStateException(s"type is empty in schema at $name")
+      //TODO: map to variant type in Spark 4.0
+      NullableType(JString("string"), nullable = true)
     case jsonObj: JObject =>
       val resolvedJsonObj = resolveRefs(jsonObj)
       // prepare SchemaFieldFormat (Airbyte extension)
@@ -233,7 +234,8 @@ class JsonToSparkSchemaConverter(inputSchema: JValue,
     json match {
       case JString(str) => SchemaType(JsonToSparkTypeMap.getOrElse(str.trim.toLowerCase, StringType), jsonType.nullable || nullable)
       case JObject(entries) if entries.isEmpty && isStrictTypingEnabled =>
-        throw new IllegalStateException(s"type is empty in schema at $resolvedName")
+        //TODO: map to variant type in Spark 4.0
+        SchemaType(StringType, nullable = true)
       case _: JArray => convertAnyType(jsonType.json, name, jsonType.nullable || nullable)
       case _ if jsonType.json.isInstanceOf[JObject] => convertAnyType(jsonType.json, name, jsonType.nullable || nullable)
       case jsonObj: JObject =>

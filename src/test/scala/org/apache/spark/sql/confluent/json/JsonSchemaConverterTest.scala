@@ -226,24 +226,27 @@ class JsonSchemaConverterTest extends AnyFunSuite with Matchers with BeforeAndAf
     assert(schema === expected)
   }
 
-  test("Array of unknown type should fail") {
+  test("Array of unknown type will return elements of string") {
 
-    assertThrows[IllegalStateException] {
-      val schema = JsonSchemaConverter.convertToSpark(
-        """
-          {
-            "$$schema": "smallTestSchema",
-            "type": "object",
-            "properties": {
-              "array" : {
-                "type" : "array",
-                "items" : {}
-              }
+    val schema = JsonSchemaConverter.convertToSpark(
+      """
+        {
+          "$$schema": "smallTestSchema",
+          "type": "object",
+          "properties": {
+            "array" : {
+              "type" : "array",
+              "items" : {}
             }
           }
-        """
-      )
-    }
+        }
+      """
+    )
+    val expected = StructType(Array(
+      StructField("array", ArrayType(StringType, containsNull = true), nullable = true)
+    ))
+
+    assert(schema === expected)
   }
 
   test("Array of various type should be merged") {
