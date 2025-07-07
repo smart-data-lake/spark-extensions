@@ -6,8 +6,11 @@ on:
       - 'master-spark*'
     types: [closed]
 
+permissions:
+  contents: write
+
 jobs:
-  build-release:
+  deploy-release:
     if: github.event.pull_request.merged == true
 
     runs-on: ubuntu-latest
@@ -18,53 +21,50 @@ jobs:
       with:
         ref: ${{ github.base_ref }}
         fetch-depth: 0
-        token: ${{ secrets.PAT_ACTIONS }}
     - name: Git Config
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-    - name: Set up JDK 11
-      uses: actions/setup-java@v1
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
       with:
-        java-version: 11
+        distribution: 'temurin'
+        java-version: 17
+        server-id: central
+        server-username: MAVEN_USERNAME
+        server-password: MAVEN_PASSWORD
+        gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+        gpg-passphrase: MAVEN_GPG_PASSPHRASE
     - name: Maven Cache
-      uses: actions/cache@v2
+      uses: actions/cache@v4
       with:
         path: ~/.m2/repository
         key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
         restore-keys: ${{ runner.os }}-maven-
         
     - name: Maven Get Version
-      run: echo MVN_CURRENT_VERSION=$(mvn -B -f /home/runner/work/spark-extensions/spark-extensions/pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+      run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.13 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
     - name: Set Release Version
       run: echo MVN_RELEASE_VERSION=${MVN_CURRENT_VERSION/-SNAPSHOT/} >> $GITHUB_ENV
     #- name: Printenv
     #  run: |
-    #    echo "MVN_CURRENT_VERSION=${MVN_CURRENT_VERSION}
-    #    echo "MVN_RELEASE_VERSION=${MVN_RELEASE_VERSION}
     #    printenv
     - name: Maven Set Release Version
       run: sed -i "/${MVN_CURRENT_VERSION}/{s//${MVN_RELEASE_VERSION}/;:p;n;bp}" pom.xml
 
     - name: Maven deploy to sonatype for Scala 2.12
-      uses: samuelmeuli/action-maven-publish@v1
-      with:
-        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-        gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
-        nexus_username: ${{ secrets.SONATYPE_USERNAME }}
-        nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
-        maven_profiles: scala-2.12,release-sonatype
-        maven_args: -B -f pom.xml
+      run: mvn -P scala-2.12,release-sonatype -B -f pom.xml clean deploy
+      env:
+        MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+        MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+        MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
     - name: Maven deploy to sonatype for Scala 2.13
-      uses: samuelmeuli/action-maven-publish@v1
-      with:
-        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-        gpg_passphrase: ${{ secrets.GPG_PASSPHRASE }}
-        nexus_username: ${{ secrets.SONATYPE_USERNAME }}
-        nexus_password: ${{ secrets.SONATYPE_PASSWORD }}
-        maven_profiles: scala-2.13,release-sonatype
-        maven_args: -B -f pom.xml
+      run: mvn -P scala-2.13,release-sonatype -B -f pom.xml clean deploy
+      env:
+        MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
+        MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
+        MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
 
     - name: Git Commit
       run: |
@@ -74,29 +74,47 @@ jobs:
       run: |
         git pull --rebase
         git tag -f ${MVN_RELEASE_VERSION} -m "Release ${MVN_RELEASE_VERSION}"
-        git push
+        git push origin ${MVN_RELEASE_VERSION} # push tag
 
-                  
-    # DEVELOP BRANCH
-    - name: Develop Git Checkout
-      run: |
-        git fetch origin ${GITHUB_HEAD_REF}
-        git checkout ${GITHUB_HEAD_REF}
-    - name: Git Merge Master into Develop
-      run: |
-        git merge origin/${GITHUB_BASE_REF}
-        git diff-index --quiet HEAD || git commit -m "Release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
-    - name: Develop Get Next Version
-      id: bump_version
-      uses: christian-draeger/increment-semantic-version@1.0.1
-      with:
-        current-version: ${{ env.MVN_RELEASE_VERSION }}
-        version-fragment: bug
-    - name: Develop Set Next Snapshot Version
-      run: sed -i "/${MVN_RELEASE_VERSION}/{s//${{ steps.bump_version.outputs.next-version }}-SNAPSHOT/;:p;n;bp}" pom.xml
-    - name: Develop Git Commit
-      run: |
-        git commit -m "Increment to next SNAPSHOT release" -a
-    - name: Develop Git Push
-      run: |
-        git push
+  update-snapshot-version:
+    needs: deploy-release
+    if: github.event_name != 'workflow_dispatch'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Git Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0
+      - name: Git Config
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Maven Get Version
+        run: echo MVN_CURRENT_VERSION=$(mvn -B -P scala-2.13 -f pom.xml -q -Dexec.executable="echo" -Dexec.args='${project.version}' --non-recursive exec:exec) >> $GITHUB_ENV
+      - name: Set Release Version
+        run: echo MVN_RELEASE_VERSION=${MVN_CURRENT_VERSION/-SNAPSHOT/} >> $GITHUB_ENV
+
+      - name: Git Merge to develop
+        run: |
+          git merge origin/${{ github.base_ref }} --no-commit
+          git diff-index --quiet HEAD || git commit -m "Merge release version ${MVN_RELEASE_VERSION}" # only if there is something to commit
+
+      - name: Develop Get Next Version
+        id: bump_version
+        uses: christian-draeger/increment-semantic-version@1.0.1
+        with:
+          current-version: ${{ env.MVN_RELEASE_VERSION }}
+          version-fragment: bug
+      - name: Develop Set Next Snapshot version
+        run: |
+          mvn versions:set -B -DnewVersion=${{ steps.bump_version.outputs.next-version }}-SNAPSHOT -f pom.xml
+      - name: Develop Git Commit Snapshot
+        run: |
+          git commit -m "Increment to next SNAPSHOT release" -a
+      - name: Develop Git Push
+        run: |
+          git push
