@@ -17,6 +17,8 @@
 
 package org.apache.spark.sql.custom
 
+import org.apache.spark.sql.custom.SparkExpressionEvaluatorFactory.parseExpression
+import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -34,48 +36,48 @@ class ExpressionEvaluatorTest extends AnyFunSuite {
 
   test("evaluate expression with functions") {
     val expression = "concat(b, '-', cast(a * 2 as int))"
-    val evaluator = new ExpressionEvaluator[TestObj,String](expr(expression))
+    val evaluator = new ExpressionEvaluator[TestObj,String](parseExpression(expression))
     val result = evaluator.apply(input)
     assert(result == "ok-3")
   }
 
   test("evaluate expression with functions on list") {
     val expression = "array_max(transform( s, entry -> entry.z ))"
-    val evaluator = new ExpressionEvaluator[TestObj,Int](expr(expression))
+    val evaluator = new ExpressionEvaluator[TestObj,Int](parseExpression(expression))
     val result = evaluator.apply(input)
     assert(result == 1)
   }
 
   test("evaluate expression on map") {
     val expression = "m['test2'].z + m['test3'].z"
-    val evaluator = new ExpressionEvaluator[TestObj,Int](expr(expression))
+    val evaluator = new ExpressionEvaluator[TestObj,Int](parseExpression(expression))
     val result = evaluator.apply(input)
     assert(result == 5)
   }
 
   test("evaluate expression returning complex type") {
     val expression = "m"
-    val evaluator = new ExpressionEvaluator[TestObj,Map[String,Entry]](expr(expression))
+    val evaluator = new ExpressionEvaluator[TestObj,Map[String,Entry]](parseExpression(expression))
     val result = evaluator.apply(input)
     assert(result.values.toSeq.head.z == 2)
   }
 
   test("evaluate expression with type any") {
     val expression = "a"
-    val evaluator = new ExpressionEvaluator[TestObj,Any](expr(expression))
+    val evaluator = new ExpressionEvaluator[TestObj,Any](parseExpression(expression))
     val result = evaluator.apply(input)
     assert(result == 1.5f)
   }
 
   test("evaluate expression: exception with unknown attribute contains its name") {
     val expression = "concat(s[0].y, b, abc)"
-    val ex = intercept[Exception](new ExpressionEvaluator[TestObj,Any](expr(expression)))
+    val ex = intercept[Exception](new ExpressionEvaluator[TestObj,Any](parseExpression(expression)))
     assert(ex.getMessage.contains("abc"))
   }
 
   test("evaluate expression: evaluation is case sensitive") {
     val expression = "concat(s[0].Y, b)"
-    val ex = intercept[Exception](new ExpressionEvaluator[TestObj, Any](expr(expression)))
+    val ex = intercept[Exception](new ExpressionEvaluator[TestObj, Any](parseExpression(expression)))
     assert(ex.getMessage.contains("Y"))
   }
 
@@ -84,11 +86,24 @@ class ExpressionEvaluatorTest extends AnyFunSuite {
     // see also https://jaceklaskowski.gitbooks.io/mastering-spark-sql/content/spark-sql-Expression-RuntimeReplaceable.html
     // and https://jaceklaskowski.gitbooks.io/mastering-spark-sql/content/spark-sql-Optimizer-ReplaceExpressions.html
     val expression = "to_date('2016-04-08', 'yyyy-MM-dd')"
-    val evaluator = new ExpressionEvaluator[TestObj,Any](expr(expression))
+    val evaluator = new ExpressionEvaluator[TestObj,Any](parseExpression(expression))
     val result = evaluator.apply(input)
     assert(result == Timestamp.valueOf(LocalDate.of(2016,4,8).atStartOfDay()))
   }
 
+
+  test("evaluate expression with user defined function") {
+    val udfFirstElementY = udf((entries: Seq[Entry]) => entries.map(_.y).head)
+    registerUdf("get_first_element", udfFirstElementY)
+    val expression = "get_first_element(s)"
+    val evaluator = SparkExpressionEvaluatorFactory.getEvaluator[TestObj,String](expression)
+    val result = evaluator.apply(input)
+    assert(result == "test0")
+  }
+
+  def registerUdf(name: String, udf: UserDefinedFunction): Unit = {
+    SparkExpressionEvaluatorFactory.registerUdf(name, exprs => SparkExpressionEvaluatorFactory.applyUdf(udf, exprs))
+  }
 
 }
 
