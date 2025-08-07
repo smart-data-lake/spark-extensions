@@ -18,7 +18,6 @@
 package org.apache.spark.sql.custom
 
 import org.apache.spark.sql.custom.SparkExpressionEvaluatorFactory.parseExpression
-import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions._
 import org.scalatest.funsuite.AnyFunSuite
 
@@ -91,20 +90,14 @@ class ExpressionEvaluatorTest extends AnyFunSuite {
     assert(result == Timestamp.valueOf(LocalDate.of(2016,4,8).atStartOfDay()))
   }
 
-
   test("evaluate expression with user defined function") {
     val udfFirstElementY = udf((entries: Seq[Entry]) => entries.map(_.y).head)
-    registerUdf("get_first_element", udfFirstElementY)
+    SparkExpressionEvaluatorFactory.registerSparkUdf("get_first_element", udfFirstElementY)
     val expression = "get_first_element(s)"
     val evaluator = SparkExpressionEvaluatorFactory.getEvaluator[TestObj,String](expression)
     val result = evaluator.apply(input)
     assert(result == "test0")
   }
-
-  def registerUdf(name: String, udf: UserDefinedFunction): Unit = {
-    SparkExpressionEvaluatorFactory.registerUdf(name, exprs => SparkExpressionEvaluatorFactory.applyUdf(udf, exprs))
-  }
-
 }
 
 case class Entry(y: String, z: Int)

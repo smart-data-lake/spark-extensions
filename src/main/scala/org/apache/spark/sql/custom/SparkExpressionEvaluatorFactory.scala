@@ -23,6 +23,10 @@ object SparkExpressionEvaluatorFactory extends ExpressionEvaluatorFactory[Expres
     functions.expr(sqlText).expr
   }
 
+  def registerSparkUdf(name: String, udf: UserDefinedFunction): Unit = {
+    registerUdf(name, exprs => SparkExpressionEvaluatorFactory.applyUdf(udf, exprs))
+  }
+
   def applyUdf(udf: UserDefinedFunction, exprs: Seq[Expression]): Expression = {
     udf match {
       case udf: SparkUserDefinedFunction => udf.createScalaUDF(exprs)
