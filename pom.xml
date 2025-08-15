@@ -403,7 +403,7 @@
 		<dependency>
 			<groupId>ch.zzeekk.spark</groupId>
 			<artifactId>expression-interface_${scala.minor.version}</artifactId>
-			<version>3.5.0-SNAPSHOT</version>
+			<version>3.5.0</version>
 		</dependency>
 
 		<dependency>
