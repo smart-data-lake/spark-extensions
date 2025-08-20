@@ -103,7 +103,7 @@
 					<plugin>
 						<groupId>org.apache.maven.plugins</groupId>
 						<artifactId>maven-gpg-plugin</artifactId>
-						<version>3.0.1</version>
+						<version>3.2.8</version>
 						<executions>
 							<execution>
 								<id>sign-artifacts</id>
@@ -129,7 +129,6 @@
 						<extensions>true</extensions>
 						<configuration>
 							<publishingServerId>central</publishingServerId>
-							<tokenAuth>true</tokenAuth>
 							<autoPublish>false</autoPublish>
 						</configuration>
 					</plugin>
@@ -399,6 +398,12 @@
 			<artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
 			<version>2.11.0</version>
 			<scope>provided</scope>
+		</dependency>
+
+		<dependency>
+			<groupId>ch.zzeekk.spark</groupId>
+			<artifactId>expression-interface_${scala.minor.version}</artifactId>
+			<version>3.5.0</version>
 		</dependency>
 
 		<dependency>

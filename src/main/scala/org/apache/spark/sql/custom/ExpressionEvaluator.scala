@@ -17,11 +17,12 @@
 
 package org.apache.spark.sql.custom
 
+import ch.zzeekk.spark.expressions.{ExpressionEvaluator => ExpressionEvaluatorIface}
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.catalyst.analysis.{Analyzer, FakeV2SessionCatalog, FunctionRegistry, Resolver, UnresolvedAttribute, caseSensitiveResolution}
 import org.apache.spark.sql.catalyst.catalog.{CatalogDatabase, ExternalCatalog, InMemoryCatalog, SessionCatalog}
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-import org.apache.spark.sql.catalyst.expressions.{BindReferences, Expression}
+import org.apache.spark.sql.catalyst.expressions.{Alias, Attribute, BindReferences, Expression}
 import org.apache.spark.sql.catalyst.optimizer.{ComputeCurrentTime, ReplaceCurrentLike, ReplaceExpressions, ReplaceUpdateFieldsExpression}
 import org.apache.spark.sql.catalyst.plans.logical.{LocalRelation, LogicalPlan, Project}
 import org.apache.spark.sql.catalyst.rules.Rule
@@ -29,16 +30,13 @@ import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.custom.ExpressionEvaluator.{findUnresolvedAttributes, resolveExpression}
-import org.apache.spark.sql.expressions.{UserDefinedAggregator, UserDefinedFunction}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{Column, Encoders}
 
-import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.util.{Failure, Success, Try}
-import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.catalyst.plans.logical.LocalRelation
+import scala.reflect.{ClassTag, classTag}
+import scala.util.{Failure, Success}
 
 /**
  * ExpressionEvaluator can evaluate a Spark SQL expression against a case class
@@ -48,7 +46,9 @@ import org.apache.spark.sql.catalyst.plans.logical.LocalRelation
  * @tparam R class of expressions expected return type. This might also be set Any, in that case the result type check is
  *           omitted and complex datatypes will not be mapped to case classes, as they are not specified.
  */
-class ExpressionEvaluator[T<:Product:TypeTag,R:TypeTag](exprCol: Column)(implicit classTagR: ClassTag[R]) {
+class ExpressionEvaluator[T<:Product:TypeTag, R:TypeTag:ClassTag](exprCol: Expression) extends ExpressionEvaluatorIface[T, R] {
+
+  val classTagR: ClassTag[R] = classTag[R]
 
   // prepare evaluator (this is Spark internal API)
   private val dataEncoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
@@ -151,27 +151,18 @@ object ExpressionEvaluator extends Logging {
    *
    * Note: this code is copied from Spark UDFRegistration.register
    */
-  def registerUdf(name: String, udf: UserDefinedFunction): Unit = {
-    udf match {
-      case udaf: UserDefinedAggregator[_, _, _] =>
-        def builder(children: Seq[Expression]) = udaf.scalaAggregator(children)
-        functionRegistry.createOrReplaceTempFunction(name, builder, "scala_udf")
-      case _ =>
-        def builder(children: Seq[Expression]) = udf.apply(children.map(Column.apply) : _*).expr
-        functionRegistry.createOrReplaceTempFunction(name, builder, "scala_udf")
-    }
+  def registerUdf(name: String, udfBuilder: Seq[Expression] => Expression): Unit = {
+    functionRegistry.createOrReplaceTempFunction(name, udfBuilder, "scala_udf")
   }
 
   /**
    * Resolve an expression against a given schema.
    * A resolved expression has a dataType and can be evaluated against data.
    */
-  def resolveExpression(exprCol: Column, schema: StructType, caseSensitive: Boolean = true): Expression = {
-    val schemaPrep = if (caseSensitive) schema
-    else StructType(schema.map(f => f.copy(name = f.name.toLowerCase)))
-    val attributes = DataTypeUtils.toAttributes(schemaPrep)
+  def resolveExpression(exprCol: Expression, schema: StructType): Expression = {
+    val attributes = DataTypeUtils.toAttributes(schema)
     val localRelation = createLocalRelation(attributes)
-    val rawPlan = Project(Seq(exprCol.alias("test").named),localRelation)
+    val rawPlan = Project(Seq(Alias(exprCol, "exprCol")()), localRelation)
     val resolvedPlan = analyzer.execute(rawPlan)
     val optimizedPlan = optimizerRules.foldLeft(resolvedPlan) {
       case (plan, rule) => rule.apply(plan)
