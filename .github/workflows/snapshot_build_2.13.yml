@@ -31,11 +31,11 @@ jobs:
       uses: actions/cache@v4
       with:
         path: ~/.m2/repository
-        key: ${{ runner.os }}-maven-2.13-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-maven-2.13
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: ${{ runner.os }}-maven
 
     - name: Build with Maven for Scala 2.13
-      run: mvn -P scala-2.13 -B clean test --file pom.xml
+      run: mvn -B -f pom.xml clean test
 
   deploy:
     needs: build
@@ -65,11 +65,11 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository
-          key: ${{ runner.os }}-maven-2.13-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-maven-2.13
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-maven
 
       - name: Maven deploy to sonatype for Scala 2.13
-        run: mvn -P scala-2.13,release-sonatype -B -f pom.xml clean deploy -DskipTests
+        run: mvn -P release-sonatype -B -f pom.xml clean deploy -DskipTests
         env:
           MAVEN_USERNAME: ${{ secrets.SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.SONATYPE_PASSWORD }}
