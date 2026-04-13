@@ -3,9 +3,10 @@ package org.apache.spark.sql.confluent.avro
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import org.apache.avro.generic.GenericDatumReader
 import org.apache.avro.io.{BinaryDecoder, DecoderFactory}
-import org.apache.spark.sql.avro.AvroDeserializer
+import org.apache.spark.sql.avro.{AvroDeserializer, AvroOptions}
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, UnaryExpression}
+import org.apache.spark.sql.catalyst.util.RebaseDateTime.RebaseSpec
 import org.apache.spark.sql.confluent.ConfluentClient
 import org.apache.spark.sql.internal.LegacyBehaviorPolicy
 import org.apache.spark.sql.types.{AbstractDataType, BinaryType, DataType}
@@ -14,7 +15,7 @@ import java.nio.ByteBuffer
 import scala.collection.mutable
 
 // copied from org.apache.spark.sql.avro.*
-case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confluentHelper: ConfluentClient[AvroSchema])
+case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confluentHelper: ConfluentClient[AvroSchema], avroOptions: AvroOptions)
   extends UnaryExpression with ExpectsInputTypes {
 
   override def inputTypes: Seq[AbstractDataType] = Seq(BinaryType)
@@ -41,7 +42,8 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
     avroBinaryDecoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, avroBinaryDecoder)
     val avroReader = avroReaders.getOrElseUpdate(schemaId, new GenericDatumReader[Any](msgSchema.rawSchema, subjectSchema.rawSchema))
     avroGenericMsg = avroReader.read(avroGenericMsg, avroBinaryDecoder)
-    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElseUpdate(schemaId, new AvroDeserializer(subjectSchema.rawSchema, dataType, LegacyBehaviorPolicy.CORRECTED.toString, useStableIdForUnionType = false))
+    val avroDeserializer = new AvroDeserializer(subjectSchema.rawSchema, dataType, datetimeRebaseMode = avroOptions.datetimeRebaseModeInRead, useStableIdForUnionType = avroOptions.useStableIdForUnionType, stableIdPrefixForUnionType = avroOptions.stableIdPrefixForUnionType, recursiveFieldMaxDepth = avroOptions.recursiveFieldMaxDepth)
+    val avro2SparkDeserializer = avro2SparkDeserializers.getOrElseUpdate(schemaId, avroDeserializer)
     avro2SparkDeserializer.deserialize(avroGenericMsg).orNull
   }
 

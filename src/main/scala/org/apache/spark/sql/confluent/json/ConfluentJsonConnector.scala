@@ -3,14 +3,14 @@ package org.apache.spark.sql.confluent.json
 import io.confluent.kafka.schemaregistry.json.JsonSchema
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.analysis.TypeCheckResult
+import org.apache.spark.sql.catalyst.dsl.expressions.DslExpression
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, NullIntolerant, TimeZoneAwareExpression, UnaryExpression}
+import org.apache.spark.sql.catalyst.expressions.{ExpectsInputTypes, Expression, TimeZoneAwareExpression, UnaryExpression}
 import org.apache.spark.sql.catalyst.json.{JSONOptions, JacksonGenerator, JacksonUtils}
 import org.apache.spark.sql.catalyst.util.{ArrayData, MapData}
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector, IncompatibleSchemaException}
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{Column, functions}
 import org.apache.spark.unsafe.types.UTF8String
 import org.json4s.JsonAST.JObject
 
@@ -28,13 +28,14 @@ class ConfluentJsonConnector(confluentClient: ConfluentClient[JsonSchema]) exten
    * @param topic the topic name.
    * @param subjectType the subject type (key or value).
    */
-  override def from_confluent(data: Column, topic: String, subjectType: SubjectType): Column = {
+  override def from_confluent(data: Expression, topic: String, subjectType: SubjectType, options: Map[String,String]): Expression = {
     import org.json4s.jackson.JsonMethods.fromJsonNode
     val subject = confluentClient.getSubject(topic, subjectType)
     val (schemaId, schema) = confluentClient.getLatestSchemaFromConfluent(subject)
     val schemaJson = fromJsonNode(schema.toJsonNode).asInstanceOf[JObject]
     val sparkSchema = JsonSchemaConverter.convertParsedSchemaToSpark(schemaJson, isStrictTypingEnabled = false)
-    functions.from_json(data.cast(StringType), sparkSchema)
+    import org.apache.spark.sql.catalyst.expressions.JsonToStructs
+    JsonToStructs(sparkSchema, options, data.cast(StringType))
   }
 
   /**
@@ -46,16 +47,16 @@ class ConfluentJsonConnector(confluentClient: ConfluentClient[JsonSchema]) exten
    * @param mutualReadCheck if a mutual read check or a simpler can read check should be executed
    * @param eagerCheck if true tiggers instantiation of converter object instances
    */
-  override def to_confluent(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column = {
+  override def to_confluent(data: Expression, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Expression = {
     to_json_confluent(data, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck, eagerCheck = eagerCheck)
   }
 
   /**
    * copied from spark.sql.functions.to_json to customize StructsToJsonWithConfluent
    */
-  private def to_json_confluent(e: Column, confluentClient: ConfluentClient[JsonSchema],
-                                topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false, options: Map[String, String] = Map()): Column = {
-    Column(StructsToJsonWithConfluent(options, e.expr, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck, eagerCheck))
+  private def to_json_confluent(e: Expression, confluentClient: ConfluentClient[JsonSchema],
+                                topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false, options: Map[String, String] = Map()): Expression = {
+    StructsToJsonWithConfluent(options, e, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck, eagerCheck)
   }
 
 }
@@ -77,7 +78,7 @@ case class StructsToJsonWithConfluent(
                           topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false,
                           timeZoneId: Option[String] = None)
   extends UnaryExpression with TimeZoneAwareExpression with CodegenFallback
-    with ExpectsInputTypes with NullIntolerant {
+    with ExpectsInputTypes {
   override def nullable: Boolean = true
 
   @transient

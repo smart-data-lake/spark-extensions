@@ -2,7 +2,9 @@ package org.apache.spark.sql.confluent.json
 
 import io.confluent.kafka.schemaregistry.json.JsonSchema
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{Column, SparkSession}
+import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.classic.{ClassicConversions, ColumnConversions, ColumnNodeToExpressionConverter, ExpressionUtils}
 import org.apache.spark.sql.confluent.{ConfluentClient, SubjectType}
 import org.apache.spark.sql.functions.struct
 import org.json4s.jackson.JsonMethods.asJsonNode
@@ -10,7 +12,12 @@ import org.mockito.Mockito._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.mockito.MockitoSugar.mock
 
-class ConfluentJsonConnectorTest extends AnyFunSuite with Logging {
+import scala.language.implicitConversions
+
+class ConfluentJsonConnectorTest extends AnyFunSuite with Logging with ColumnConversions with ClassicConversions {
+
+  override protected def converter: ColumnNodeToExpressionConverter = ColumnNodeToExpressionConverter
+  private implicit def toCol(e: Expression): Column = ExpressionUtils.column(e)
 
   private val spark = SparkSession.builder().master("local").getOrCreate()
   import spark.implicits._
@@ -37,11 +44,11 @@ class ConfluentJsonConnectorTest extends AnyFunSuite with Logging {
 
     // convert to avro
     val dfJson = df1
-      .select(jsonConnector.to_confluent(struct("*"), topicA, SubjectType.value).as("json"))
+      .select(jsonConnector.to_confluent(struct("*").expr, topicA, SubjectType.value).as("json"))
 
     // convert back to spark
     val dfSpark = dfJson
-      .withColumn("data", jsonConnector.from_confluent($"json", topicA, SubjectType.value).as("spark"))
+      .withColumn("data", jsonConnector.from_confluent($"json".expr, topicA, SubjectType.value).as("spark"))
       .select($"data.*")
 
     assert(df1.head == dfSpark.head)

@@ -23,6 +23,7 @@ import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, Sch
 import io.confluent.kafka.schemaregistry.json.JsonSchemaProvider
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.Column
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 
 import scala.jdk.CollectionConverters._
@@ -140,8 +141,9 @@ trait ConfluentConnector extends Serializable {
    * @param data the binary column.
    * @param topic the topic name.
    * @param subjectType the subject type (key or value).
+   * @param options options for interpreting avro schema, see also Spark Avro DataSource options
    */
-  def from_confluent(data: Column, topic: String, subjectType: SubjectType): Column
+  def from_confluent(data: Expression, topic: String, subjectType: SubjectType, options: Map[String,String] = Map()): Expression
 
   /**
    * Convert a column from Spark to confluent format.
@@ -152,7 +154,7 @@ trait ConfluentConnector extends Serializable {
    * @param mutualReadCheck if a mutual read check or a simpler can read check should be executed
    * @param eagerCheck if true tiggers instantiation of converter object instances (only if connector uses such mechanisms)
    */
-  def to_confluent(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column
+  def to_confluent(data: Expression, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Expression
 
 }
 

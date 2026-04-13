@@ -33,7 +33,7 @@ import scala.reflect.runtime.universe._
  */
 class RowDecoder[T <: Product : TypeTag] extends Serializable {
 
-  private val encoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
+  private val encoder = ExpressionEncoder[T]()
   private val internalRowConverter = CatalystTypeConverters.createToCatalystConverter(encoder.schema)
   private val resolvedEncoder = encoder.resolveAndBind(DataTypeUtils.toAttributes(encoder.schema))
   private val rowDeserializer = resolvedEncoder.createDeserializer()

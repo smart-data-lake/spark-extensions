@@ -2,6 +2,10 @@ package org.apache.spark.sql.custom
 
 import ch.zzeekk.spark.expressions.ExpressionEvaluatorFactory
 import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.catalyst.parser.ParserInterface
+import org.apache.spark.sql.classic.{ColumnNodeToExpressionConverter, SparkSession, UserDefinedFunctionUtils}
+import org.apache.spark.sql.execution.SparkSqlParser
+import org.apache.spark.sql.execution.aggregate.ScalaAggregator
 import org.apache.spark.sql.expressions.{SparkUserDefinedFunction, UserDefinedAggregator, UserDefinedFunction}
 import org.apache.spark.sql.functions
 import org.apache.spark.sql.functions.udf
@@ -12,6 +16,12 @@ import scala.reflect.runtime.universe
 
 
 object SparkExpressionEvaluatorFactory extends ExpressionEvaluatorFactory {
+
+  private lazy val parser: ParserInterface = {
+    SparkSession.getActiveSession.map(_.sessionState.sqlParser).getOrElse {
+      new SparkSqlParser()
+    }
+  }
 
   override def getEvaluator[T <: Product : universe.TypeTag, R: universe.TypeTag : ClassTag](expression: String): ExpressionEvaluator[T, R] = {
     new ExpressionEvaluator[T, R](parseExpression(expression))
@@ -40,7 +50,7 @@ object SparkExpressionEvaluatorFactory extends ExpressionEvaluatorFactory {
   override def registerUdf[RT: universe.TypeTag, A1: universe.TypeTag, A2: universe.TypeTag, A3: universe.TypeTag, A4: universe.TypeTag, A5: universe.TypeTag, A6: universe.TypeTag, A7: universe.TypeTag, A8: universe.TypeTag, A9: universe.TypeTag, A10: universe.TypeTag](name: String, f: (A1, A2, A3, A4, A5, A6, A7, A8, A9, A10) => RT): Unit = ExpressionEvaluator.registerUdf(name, exprs => applyUdf(udf(f), exprs))
 
   def parseExpression(sqlText: String): Expression = {
-    functions.expr(sqlText).expr
+    parser.parseExpression(sqlText)
   }
 
   def resolveExpression(exprCol: Expression, schema: StructType): Expression = {
@@ -53,8 +63,8 @@ object SparkExpressionEvaluatorFactory extends ExpressionEvaluatorFactory {
 
   def applyUdf(udf: UserDefinedFunction, exprs: Seq[Expression]): Expression = {
     udf match {
-      case udf: SparkUserDefinedFunction => udf.createScalaUDF(exprs)
-      case udaf: UserDefinedAggregator[_, _, _] => udaf.scalaAggregator(exprs)
+      case udf: SparkUserDefinedFunction => UserDefinedFunctionUtils.toScalaUDF(udf, exprs)
+      case udaf: UserDefinedAggregator[_, _, _] => ScalaAggregator(udaf, exprs).toAggregateExpression(isDistinct = false)
       case _ => throw new IllegalStateException(s"applyUdf is only implemented for SparkUserDefinedFunction and UserDefinedAggregator, but not for ${getClass.getSimpleName}")
     }
   }

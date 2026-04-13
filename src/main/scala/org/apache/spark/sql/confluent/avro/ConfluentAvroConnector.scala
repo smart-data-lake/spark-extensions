@@ -3,11 +3,14 @@ package org.apache.spark.sql.confluent.avro
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
 import org.apache.spark.sql.Column
-import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector}
+import org.apache.spark.sql.avro.AvroOptions
+import org.apache.spark.sql.catalyst.expressions.Expression
+import org.apache.spark.sql.classic.ColumnConversions.toRichColumn
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
+import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector}
 
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 
 /**
  * Provides Spark SQL functions from/to_confluent_avro for decoding/encoding confluent avro messages.
@@ -23,9 +26,9 @@ class ConfluentAvroConnector(confluentClient: ConfluentClient[AvroSchema]) exten
    * @param topic the topic name.
    * @param subjectType the subject type (key or value).
    */
-  override def from_confluent(data: Column, topic: String, subjectType: SubjectType): Column = {
+  override def from_confluent(data: Expression, topic: String, subjectType: SubjectType, options: Map[String,String] = Map()): Expression = {
     val subject = confluentClient.getSubject(topic, subjectType)
-    new Column(ConfluentAvroDataToCatalyst(data.expr, subject, confluentClient))
+    ConfluentAvroDataToCatalyst(data, subject, confluentClient, AvroOptions(options))
   }
 
   /**
@@ -38,11 +41,11 @@ class ConfluentAvroConnector(confluentClient: ConfluentClient[AvroSchema]) exten
    * @param updateAllowed if subject schema should be updated if compatible
    * @param eagerCheck if true tiggers instantiation of converter object instances
    */
-  override def to_confluent(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column = {
+  override def to_confluent(data: Expression, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Expression = {
     val subject = confluentClient.getSubject(topic, subjectType)
-    val converterExpr = CatalystDataToConfluentAvro(data.expr, subject, confluentClient, updateAllowed, mutualReadCheck )
+    val converterExpr = CatalystDataToConfluentAvro(data, subject, confluentClient, updateAllowed, mutualReadCheck )
     if (eagerCheck) converterExpr.test()
-    new Column(converterExpr)
+    converterExpr
   }
 
   protected def debugSchemaDiff(schema1: AvroSchema, schema2: AvroSchema): Seq[String] = {

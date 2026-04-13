@@ -51,7 +51,7 @@ class ExpressionEvaluator[T<:Product:TypeTag, R:TypeTag:ClassTag](exprCol: Expre
   val classTagR: ClassTag[R] = classTag[R]
 
   // prepare evaluator (this is Spark internal API)
-  private val dataEncoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
+  private val dataEncoder = ExpressionEncoder[T]()
   private val dataSerializer = dataEncoder.createSerializer()
   private val expr = SQLConf.withExistingConf(ExpressionEvaluator.sqlConf) {
     resolveExpression(exprCol, dataEncoder.schema)

@@ -45,15 +45,15 @@ case class UnsafeUnaryUdfExpression(child: Expression, udf: Any => Any, tgtDataT
 
 /**
  * This defines a helper method to create the Udf.
- * Note that a Udf is a function which takes Columns as input and returns an derived column.
+ * Note that a Udf is a function which takes Columns as input and returns a derived column.
  * The same UDF can be applied to several columns, each applications generates an UnsafeUnaryUdfExpression as derived column.
  */
 object UnsafeUnaryUdf {
-  def apply(udf: Any => Any, srcType: DataType, tgtType: DataType): (Column => Column) = {
-    (col: Column) => {
+  def apply(udf: Any => Any, srcType: DataType, tgtType: DataType): (Expression => Expression) = {
+    (col: Expression) => {
       val rowConverter = CatalystTypeConverters.createToScalaConverter(srcType)
       val internalrowConverter = CatalystTypeConverters.createToCatalystConverter(tgtType)
-      new Column(UnsafeUnaryUdfExpression(col.expr, v => internalrowConverter(udf(rowConverter(v))), tgtType))
+      UnsafeUnaryUdfExpression(col, v => internalrowConverter(udf(rowConverter(v))), tgtType)
     }
   }
 }
