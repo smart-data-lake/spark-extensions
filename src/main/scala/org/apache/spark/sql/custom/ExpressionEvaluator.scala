@@ -32,7 +32,6 @@ import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.custom.ExpressionEvaluator.{findUnresolvedAttributes, resolveExpression}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
-import org.apache.spark.sql.{Column, Encoders}
 
 import scala.reflect.runtime.universe._
 import scala.reflect.{ClassTag, classTag}

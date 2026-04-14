@@ -3,11 +3,10 @@ package org.apache.spark.sql.custom
 import ch.zzeekk.spark.expressions.ExpressionEvaluatorFactory
 import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.parser.ParserInterface
-import org.apache.spark.sql.classic.{ColumnNodeToExpressionConverter, SparkSession, UserDefinedFunctionUtils}
+import org.apache.spark.sql.classic.{SparkSession, UserDefinedFunctionUtils}
 import org.apache.spark.sql.execution.SparkSqlParser
 import org.apache.spark.sql.execution.aggregate.ScalaAggregator
 import org.apache.spark.sql.expressions.{SparkUserDefinedFunction, UserDefinedAggregator, UserDefinedFunction}
-import org.apache.spark.sql.functions
 import org.apache.spark.sql.functions.udf
 import org.apache.spark.sql.types.StructType
 

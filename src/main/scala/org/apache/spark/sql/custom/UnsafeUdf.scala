@@ -17,11 +17,10 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.CatalystTypeConverters
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnaryExpression}
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.types.DataType
 
 /**
  * With Spark 3.0 the API for Udf's was made more typesafe. It's no longer possible to create a Udf and give it's return type as StructType.

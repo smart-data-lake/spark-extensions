@@ -7,7 +7,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.avro.AvroSerializer
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnaryExpression}
-import org.apache.spark.sql.confluent.{ConfluentClient, IncompatibleSchemaException}
+import org.apache.spark.sql.confluent.ConfluentClient
 import org.apache.spark.sql.types.{BinaryType, DataType}
 
 import java.io.ByteArrayOutputStream

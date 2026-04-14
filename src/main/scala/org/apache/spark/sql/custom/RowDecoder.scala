@@ -17,10 +17,10 @@
 
 package org.apache.spark.sql.custom
 
+import org.apache.spark.sql.Row
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.types.DataTypeUtils
 import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
-import org.apache.spark.sql.{Encoders, Row}
 
 import scala.reflect.runtime.universe._
 

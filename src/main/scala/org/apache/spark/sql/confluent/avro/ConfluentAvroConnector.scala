@@ -2,10 +2,8 @@ package org.apache.spark.sql.confluent.avro
 
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import org.apache.avro.{Schema, SchemaValidatorBuilder}
-import org.apache.spark.sql.Column
 import org.apache.spark.sql.avro.AvroOptions
 import org.apache.spark.sql.catalyst.expressions.Expression
-import org.apache.spark.sql.classic.ColumnConversions.toRichColumn
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 import org.apache.spark.sql.confluent.{ConfluentClient, ConfluentConnector}
 
