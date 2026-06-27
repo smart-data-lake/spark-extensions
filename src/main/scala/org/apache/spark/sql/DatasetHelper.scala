@@ -78,4 +78,11 @@ object DatasetHelper {
   def toCol(expr: Expression): Column = {
     ExpressionUtils.column(expr)
   }
+
+  /**
+   * Convert an Expression to a Column, e.g. to use it in Dataset.select or Dataset.withColumn
+   */
+  def toExpr(col: Column): Expression = {
+    ExpressionUtils.expression(col)
+  }
 }
