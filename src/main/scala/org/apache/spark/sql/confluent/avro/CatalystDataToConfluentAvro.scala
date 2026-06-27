@@ -4,7 +4,7 @@ import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import org.apache.avro.generic.GenericDatumWriter
 import org.apache.avro.io.{BinaryEncoder, EncoderFactory}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.avro.AvroSerializer
+import org.apache.spark.sql.avro.{AvroSerializer, SchemaConverters}
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnaryExpression}
 import org.apache.spark.sql.confluent.ConfluentClient
@@ -24,7 +24,7 @@ case class CatalystDataToConfluentAvro(child: Expression, subject: String, confl
 
   @transient private lazy val tgt = {
     // Avro schema is not serializable in older versions. We must be careful to not store it in an attribute of the class.
-    val newSchema = new AvroSchema(AvroSchemaConverter.toAvroType(child.dataType, child.nullable))
+    val newSchema = new AvroSchema(SchemaConverters.toAvroType(child.dataType, child.nullable))
     val (schemaId, schema) = if (updateAllowed) confluentHelper.setOrUpdateSchema(subject, newSchema, mutualReadCheck)
     else confluentHelper.setOrGetSchema(subject, newSchema)
     val serializer = new AvroSerializer(child.dataType, schema.rawSchema, child.nullable)

@@ -2,11 +2,12 @@ package org.apache.spark.sql.confluent.avro
 
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import org.apache.spark.internal.Logging
+import org.apache.spark.sql.avro.SchemaConverters
 import org.apache.spark.sql.catalyst.expressions.Expression
-import org.apache.spark.sql.{Column, SparkSession}
 import org.apache.spark.sql.classic.{ColumnConversions, ColumnNodeToExpressionConverter, ExpressionUtils}
 import org.apache.spark.sql.confluent.SubjectType
 import org.apache.spark.sql.functions.struct
+import org.apache.spark.sql.{Column, SparkSession}
 import org.mockito.Mockito._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.mockito.MockitoSugar.mock
@@ -27,7 +28,7 @@ class ConfluentAvroConnectorTest extends AnyFunSuite with Logging with ColumnCon
   private val schemaId1 = 1
 
   // json schemas
-  val jsonSchema1 = new AvroSchema(AvroSchemaConverter.toAvroType(df1.schema))
+  val jsonSchema1 = new AvroSchema(SchemaConverters.toAvroType(df1.schema))
 
   // mock confluent client
   val confluentClientMock = mock[AvroConfluentClient]

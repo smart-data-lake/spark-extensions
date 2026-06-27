@@ -2,12 +2,12 @@ package org.apache.spark.sql.confluent.avro
 
 import io.confluent.kafka.schemaregistry.avro.AvroSchema
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.avro.AvroOptions
 import org.apache.spark.sql.Row
-import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
+import org.apache.spark.sql.avro.{AvroOptions, SchemaConverters}
 import org.apache.spark.sql.catalyst.expressions.BoundReference
+import org.apache.spark.sql.catalyst.{CatalystTypeConverters, InternalRow}
 import org.apache.spark.sql.confluent.{ConfluentClient, avro}
-import org.apache.spark.sql.types.{BooleanType, FloatType, IntegerType, LongType, StringType, StructField, StructType}
+import org.apache.spark.sql.types._
 import org.mockito.Mockito._
 import org.scalatest.funsuite.AnyFunSuite
 import org.scalatestplus.mockito.MockitoSugar.mock
@@ -32,7 +32,7 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
     StructField("e", IntegerType, nullable = false)
   ))
   private val expr1 = BoundReference(0, schema1, nullable = false)
-  private val avroSchema1 = new AvroSchema(AvroSchemaConverter.toAvroType(schema1, nullable = false))
+  private val avroSchema1 = new AvroSchema(SchemaConverters.toAvroType(schema1, nullable = false))
 
   private val schema2 = StructType(Seq(
     StructField("a", StructType(Seq(
@@ -48,7 +48,7 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
     StructField("e", LongType, nullable = false)
   ))
   private val expr2 = BoundReference(0, schema2, nullable = false)
-  private val avroSchema2 = new AvroSchema(AvroSchemaConverter.toAvroType(schema2, nullable = false))
+  private val avroSchema2 = new AvroSchema(SchemaConverters.toAvroType(schema2, nullable = false))
 
   // create internal rows
   private val internalRowConverter1 = CatalystTypeConverters.createToCatalystConverter(schema1)
@@ -78,7 +78,7 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
     val toRowConverter = ConfluentAvroDataToCatalyst(expr2, subjectA, confluentClientMock, AvroOptions(Map()))
     val finalInternalRow = toRowConverter.nullSafeEval(confluentAvroMsg)
 
-    assert(internalRow2 == finalInternalRow)
+    assert(finalInternalRow == internalRow2)
   }
 
   test("schema evolution on read: convert row with old schema to avro and back to row with current schema") {
@@ -94,7 +94,7 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
     assert(internalRow1As2 == finalInternalRow)
   }
 
-  // Doesn't work with current implementation of CatalystDataToConfluentAvro / MyAvroSerializer as they are based on field positions.
+  // Doesn't work with current implementation of CatalystDataToConfluentAvro / AvroSerializer as it does not yet support type widening from Int to Long for field e.
   ignore("schema evolution on write: convert row with old schema to avro with new schema and back to row") {
 
     // convert to avro with new schema
