@@ -84,7 +84,7 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
     val binary = input.asInstanceOf[Array[Byte]]
     try {
       val (schemaId, avroMsg) = parseConfluentMsg(binary)
-      val (_, msgSchema) = confluentHelper.getSchemaFromConfluent(schemaId)
+      val msgSchema = confluentHelper.getSchemaFromConfluent(schemaId)._2
       decoder = DecoderFactory.get().binaryDecoder(avroMsg, 0, avroMsg.length, decoder)
       val reader = avroReaders.getOrElseUpdate(schemaId, new GenericDatumReader[Any](msgSchema.rawSchema,subjectSchema.rawSchema()))
       result = reader.read(result, decoder)

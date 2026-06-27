@@ -92,8 +92,10 @@ class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logg
   }
 
   def getLatestSchemaFromConfluent(subject: String): (Int, S) = {
-    val m = sr.getLatestSchemaMetadata(subject)
-    getSchemaFromConfluent(m.getId)
+    val maxVersion = sr.getAllVersions(subject).asScala.max
+    val meta = sr.getSchemaMetadata(subject, maxVersion)
+    val schema = sr.getSchemaById(meta.getId)
+    (meta.getId, schema.asInstanceOf[S])
   }
 
   def getSchemaFromConfluent(id: Int): (Int, S) = {
