@@ -148,25 +148,33 @@ case class ConfluentAvroDataToCatalyst(child: Expression, subject: String, confl
 object AvroHelper {
   def fixNullableDefault(schema: Schema): Schema = {
     import scala.jdk.CollectionConverters._
-    if (schema.getType ne Schema.Type.NULL) {
-      val fields = schema.getFields.asScala.map { field =>
-        if (field.schema.getType eq Schema.Type.UNION) {
-          val nullTpeExists = field.schema.getTypes.asScala.exists(_.getType eq Schema.Type.NULL)
-          val fixedDefaultValue = if (nullTpeExists && field.defaultVal == null) {
-            Schema.Field.NULL_DEFAULT_VALUE
-          } else field.defaultVal()
-          val fields = field.schema.getTypes.asScala.map{ fieldSchema =>
-            if (fieldSchema.getType eq Schema.Type.RECORD) fixNullableDefault(fieldSchema)
-            else if (fieldSchema.getType eq Schema.Type.ARRAY) {
-              val elementType = fixNullableDefault(fieldSchema.getElementType)
-              Schema.createArray(elementType)
-            } else fieldSchema
-          }.sortBy(_.getType eq Schema.Type.NULL).reverse // sort null type frist
-          .asJava
-          new Schema.Field(field.name, Schema.createUnion(fields), field.doc, fixedDefaultValue)
-        } else new Schema.Field(field.name, field.schema, field.doc, field.defaultVal)
-      }
-      Schema.createRecord(schema.getName, schema.getDoc, schema.getNamespace, false, fields.asJava)
-    } else schema
+    schema.getType match {
+      case Schema.Type.RECORD =>
+        val fields = schema.getFields.asScala.map { field =>
+          if (field.schema.getType eq Schema.Type.UNION) {
+            val nullTpeExists = field.schema.getTypes.asScala.exists (_.getType eq Schema.Type.NULL)
+            val fixedDefaultValue = if (nullTpeExists && field.defaultVal == null) {
+              Schema.Field.NULL_DEFAULT_VALUE
+            } else field.defaultVal()
+            val fieldSchemas = field.schema.getTypes.asScala.map(fixNullableDefault)
+              .sortBy (_.getType eq Schema.Type.NULL).reverse // sort null type frist
+              .asJava
+            new Schema.Field (field.name, Schema.createUnion (fieldSchemas), field.doc, fixedDefaultValue)
+          } else {
+            new Schema.Field (field.name, field.schema, field.doc, field.defaultVal) // field can not be reused in different record
+          }
+        }
+        Schema.createRecord (schema.getName, schema.getDoc, schema.getNamespace, false, fields.asJava)
+      case Schema.Type.ARRAY =>
+        val elementType = fixNullableDefault (schema.getElementType)
+        Schema.createArray(elementType)
+      case Schema.Type.MAP =>
+        val valueType = fixNullableDefault (schema.getValueType)
+        Schema.createMap(valueType)
+      case Schema.Type.UNION =>
+        val types = schema.getTypes.asScala.map(fixNullableDefault).asJava
+        Schema.createUnion(types)
+      case _ => schema
+    }
   }
 }
