@@ -78,8 +78,11 @@ class ConfluentJsonConnector(confluentClient: ConfluentClient[JsonSchema]) exten
       mutualReadCheck: Boolean = false,
       eagerCheck: Boolean = false,
       options: Map[String, String] = Map()
-  ): Expression =
-    StructsToJsonWithConfluent(options, e, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck, eagerCheck)
+  ): Expression = {
+    val expr = StructsToJsonWithConfluent(options, e, confluentClient, topic, subjectType, updateAllowed, mutualReadCheck)
+    if (eagerCheck) expr.test()
+    expr
+  }
 
 }
 
@@ -101,7 +104,6 @@ case class StructsToJsonWithConfluent(
     subjectType: SubjectType,
     updateAllowed: Boolean = false,
     mutualReadCheck: Boolean = false,
-    eagerCheck: Boolean = false,
     timeZoneId: Option[String] = None,
 ) extends UnaryExpression
   with RuntimeReplaceable
@@ -129,7 +131,6 @@ case class StructsToJsonWithConfluent(
     newSchema
   }
 
-
   override def checkInputDataTypes(): TypeCheckResult = inputSchema match {
     case dt @ (_: StructType | _: MapType | _: ArrayType | _: VariantType) =>
       JacksonUtils.verifyType(prettyName, dt)
@@ -151,6 +152,13 @@ case class StructsToJsonWithConfluent(
 
   @transient
   private lazy val evaluator = StructsToJsonEvaluator(options, inputSchema, timeZoneId)
+
+  /**
+   * Instantiate evaluator for schema compatibility check
+   */
+  def test(): Unit = {
+    evaluator // initialize lazy value
+  }
 
   override def replacement: Expression = Invoke(
     Literal.create(evaluator, ObjectType(classOf[StructsToJsonEvaluator])),

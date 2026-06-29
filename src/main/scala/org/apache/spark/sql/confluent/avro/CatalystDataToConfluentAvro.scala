@@ -24,7 +24,7 @@ case class CatalystDataToConfluentAvro(child: Expression, subject: String, confl
 
   @transient private lazy val tgt = {
     // Avro schema is not serializable in older versions. We must be careful to not store it in an attribute of the class.
-    val newSchema = new AvroSchema(SchemaConverters.toAvroType(child.dataType, child.nullable))
+    val newSchema = new AvroSchema(AvroHelper.fixNullableDefault(SchemaConverters.toAvroType(child.dataType, child.nullable)))
     val (schemaId, schema) = if (updateAllowed) confluentHelper.setOrUpdateSchema(subject, newSchema, mutualReadCheck)
     else confluentHelper.setOrGetSchema(subject, newSchema)
     val serializer = new AvroSerializer(child.dataType, schema.rawSchema, child.nullable)

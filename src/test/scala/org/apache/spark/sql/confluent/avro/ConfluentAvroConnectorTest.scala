@@ -27,16 +27,16 @@ class ConfluentAvroConnectorTest extends AnyFunSuite with Logging with ColumnCon
   private val df1 = data1.toDF("a","c","d")
   private val schemaId1 = 1
 
-  // json schemas
-  val jsonSchema1 = new AvroSchema(SchemaConverters.toAvroType(df1.schema))
+  // schemas
+  val schema1 = new AvroSchema(SchemaConverters.toAvroType(df1.schema))
 
   // mock confluent client
   val confluentClientMock = mock[AvroConfluentClient]
   val topicA = "testA"
   val subjectA = s"$topicA-value"
-  when(confluentClientMock.setOrGetSchema(subjectA, jsonSchema1)).thenReturn((schemaId1, jsonSchema1))
-  when(confluentClientMock.getSchemaFromConfluent(schemaId1)).thenReturn((schemaId1, jsonSchema1))
-  when(confluentClientMock.getLatestSchemaFromConfluent(subjectA)).thenReturn((schemaId1, jsonSchema1))
+  when(confluentClientMock.setOrGetSchema(subjectA, schema1)).thenReturn((schemaId1, schema1))
+  when(confluentClientMock.getSchemaFromConfluent(schemaId1)).thenReturn((schemaId1, schema1))
+  when(confluentClientMock.getLatestSchemaFromConfluent(subjectA)).thenReturn((schemaId1, schema1))
   when(confluentClientMock.getSubject(topicA,SubjectType.value)).thenReturn(subjectA)
   val avroConnector = new ConfluentAvroConnector(confluentClientMock)
 
