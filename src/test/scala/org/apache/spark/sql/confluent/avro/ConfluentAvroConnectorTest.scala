@@ -28,7 +28,7 @@ class ConfluentAvroConnectorTest extends AnyFunSuite with Logging with ColumnCon
   private val schemaId1 = 1
 
   // schemas
-  val schema1 = new AvroSchema(SchemaConverters.toAvroType(df1.schema))
+  val schema1 = new AvroSchema(AvroHelper.fixNullableDefault(SchemaConverters.toAvroType(df1.schema)))
 
   // mock confluent client
   val confluentClientMock = mock[AvroConfluentClient]

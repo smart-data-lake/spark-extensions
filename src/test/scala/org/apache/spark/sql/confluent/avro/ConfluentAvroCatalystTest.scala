@@ -32,7 +32,7 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
     StructField("e", IntegerType, nullable = false)
   ))
   private val expr1 = BoundReference(0, schema1, nullable = false)
-  private val avroSchema1 = new AvroSchema(SchemaConverters.toAvroType(schema1, nullable = false))
+  private val avroSchema1 = new AvroSchema(AvroHelper.fixNullableDefault(SchemaConverters.toAvroType(schema1, nullable = false)))
 
   private val schema2 = StructType(Seq(
     StructField("a", StructType(Seq(
@@ -48,7 +48,7 @@ class ConfluentAvroCatalystTest extends AnyFunSuite with Logging {
     StructField("e", LongType, nullable = false)
   ))
   private val expr2 = BoundReference(0, schema2, nullable = false)
-  private val avroSchema2 = new AvroSchema(SchemaConverters.toAvroType(schema2, nullable = false))
+  private val avroSchema2 = new AvroSchema(AvroHelper.fixNullableDefault(SchemaConverters.toAvroType(schema2, nullable = false)))
 
   // create internal rows
   private val internalRowConverter1 = CatalystTypeConverters.createToCatalystConverter(schema1)

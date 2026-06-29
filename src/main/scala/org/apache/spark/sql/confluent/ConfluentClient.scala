@@ -86,7 +86,6 @@ class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logg
    * @return confluent schemaId and registered schema
    */
   def setOrGetSchema(subject: String, newSchema: S): (Int, S) = {
-
     if (!schemaExists(subject)) return registerSchema(subject, newSchema)
     getLatestSchemaFromConfluent(subject)
   }
