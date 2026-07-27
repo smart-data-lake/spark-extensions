@@ -160,7 +160,7 @@ object ExpressionEvaluator extends Logging {
    */
   def resolveExpression(exprCol: Expression, schema: StructType): Expression = {
     val attributes = DataTypeUtils.toAttributes(schema)
-    val localRelation = LocalRelation(attributes, data = Seq(), isStreaming = false)
+    val localRelation = LocalRelation(attributes:_*)
     val rawPlan = Project(Seq(Alias(exprCol, "exprCol")()), localRelation)
     val resolvedPlan = analyzer.execute(rawPlan)
     val optimizedPlan = optimizerRules.foldLeft(resolvedPlan) {
