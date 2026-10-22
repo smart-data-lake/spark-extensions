@@ -1,7 +1,7 @@
 package org.apache.spark.util
 
-import scala.collection.{Map, AbstractMap}
 import scala.collection.immutable.ListMap
+import scala.collection.{AbstractMap, Map}
 
 /**
  * LazyListMapWrapper can be used to break child dependencies in recursive algorithms

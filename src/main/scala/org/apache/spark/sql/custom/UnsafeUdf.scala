@@ -17,11 +17,10 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.CatalystTypeConverters
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodeGenerator, CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnaryExpression}
-import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.types.DataType
 
 /**
  * With Spark 3.0 the API for Udf's was made more typesafe. It's no longer possible to create a Udf and give it's return type as StructType.
@@ -45,15 +44,15 @@ case class UnsafeUnaryUdfExpression(child: Expression, udf: Any => Any, tgtDataT
 
 /**
  * This defines a helper method to create the Udf.
- * Note that a Udf is a function which takes Columns as input and returns an derived column.
+ * Note that a Udf is a function which takes Columns as input and returns a derived column.
  * The same UDF can be applied to several columns, each applications generates an UnsafeUnaryUdfExpression as derived column.
  */
 object UnsafeUnaryUdf {
-  def apply(udf: Any => Any, srcType: DataType, tgtType: DataType): (Column => Column) = {
-    (col: Column) => {
+  def apply(udf: Any => Any, srcType: DataType, tgtType: DataType): (Expression => Expression) = {
+    (col: Expression) => {
       val rowConverter = CatalystTypeConverters.createToScalaConverter(srcType)
       val internalrowConverter = CatalystTypeConverters.createToCatalystConverter(tgtType)
-      new Column(UnsafeUnaryUdfExpression(col.expr, v => internalrowConverter(udf(rowConverter(v))), tgtType))
+      UnsafeUnaryUdfExpression(col, v => internalrowConverter(udf(rowConverter(v))), tgtType)
     }
   }
 }

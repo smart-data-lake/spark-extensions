@@ -34,7 +34,6 @@ class XsdSchemaConverterTest extends AnyFunSuite {
     val xsdContent = Source.fromResource("xmlSchema/complex.xsd").mkString
     val schema = XsdSchemaConverter.read(xsdContent, 3)
     // nested lists
-    schema.printTreeString()
     val nodeModifiedArrayType = getNestedElement(schema, Seq("tree","nodes","modified","node")).asInstanceOf[ArrayType]
     val nodeModifiedStructType = nodeModifiedArrayType.elementType.asInstanceOf[StructType]
     // attributeGroup

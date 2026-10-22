@@ -20,7 +20,10 @@ package org.apache.spark.sql
 import org.apache.spark.SparkEnv
 import org.apache.spark.rdd.BlockRDD
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.classic.ClassicConversions.castToImpl
+import org.apache.spark.sql.classic.{Dataset, ExpressionUtils}
 import org.apache.spark.sql.types.StructType
 import org.apache.spark.storage.{StorageLevel, TempLocalBlockId}
 
@@ -32,6 +35,7 @@ object DatasetHelper {
    * Show Dataset but return string instead of writing to stdout
    **/
   def showString(ds: Dataset[_], numRows: Int = 20, truncate: Int = 20, vertical: Boolean = false): String = {
+    // attention, this uses implicit conversion to classic Dataset!
     ds.showString(numRows, truncate, vertical)
   }
 
@@ -56,13 +60,29 @@ object DatasetHelper {
       }
     // create RDD and DataFrame from blocks
     val rdd = new BlockRDD[InternalRow](session.sparkContext, blockIds.toArray)
+    // attention, this uses implicit conversion to classic SparkSession!
     session.internalCreateDataFrame(rdd, schema)
   }
 
   /**
    * Manipulate Logical Plan of a DataFrame
    * */
-  def modifyPlan(df: DataFrame, fun: LogicalPlan => LogicalPlan): DataFrame = {
+  def modifyPlan(df: Dataset[_], fun: LogicalPlan => LogicalPlan): Dataset[_] = {
+    // attention, this uses implicit conversion to classic SparkSession!
     Dataset.ofRows(df.sparkSession, fun(df.logicalPlan))
+  }
+
+  /**
+   * Convert an Expression to a Column, e.g. to use it in Dataset.select or Dataset.withColumn
+   */
+  def toCol(expr: Expression): Column = {
+    ExpressionUtils.column(expr)
+  }
+
+  /**
+   * Convert an Expression to a Column, e.g. to use it in Dataset.select or Dataset.withColumn
+   */
+  def toExpr(col: Column): Expression = {
+    ExpressionUtils.expression(col)
   }
 }

@@ -17,7 +17,6 @@
 
 package org.apache.spark.sql.custom
 
-import org.apache.spark.sql.Column
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.{CodegenContext, ExprCode}
 import org.apache.spark.sql.catalyst.expressions.{Expression, UnaryExpression}
@@ -42,13 +41,13 @@ object NullableHelper {
    * If the column contains null values at runtime, execution will stop with IllegalStateException.
    * Often it's better to use coalesce to modify schema of a column to be not nullable, and set a default value for values that are null.
    */
-  def makeNotNullable(data: Column): Column = {
-    new Column(SetNullable(data.expr, false))
+  def makeNotNullable(data: Expression): Expression = {
+    SetNullable(data, false)
   }
   /**
    * Modifies the nullability property of a column to be nullable.
    */
-  def makeNullable(data: Column): Column = {
-    new Column(SetNullable(data.expr, true))
+  def makeNullable(data: Expression): Expression = {
+    SetNullable(data, true)
   }
 }

@@ -18,8 +18,8 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>io.smartdatalake</groupId>
-	<artifactId>spark-extensions_${scala.minor.version}</artifactId>
-	<version>3.5.6-SNAPSHOT</version>
+	<artifactId>spark-extensions_2.13</artifactId>
+	<version>4.1.0-SNAPSHOT</version>
 
 	<packaging>jar</packaging>
 
@@ -50,20 +50,6 @@
 	</developers>
 
 	<profiles>
-		<profile>
-			<id>scala-2.12</id>
-			<properties>
-				<scala.minor.version>2.12</scala.minor.version>
-				<scala.version>${scala.minor.version}.17</scala.version>
-			</properties>
-		</profile>
-		<profile>
-			<id>scala-2.13</id>
-			<properties>
-				<scala.minor.version>2.13</scala.minor.version>
-				<scala.version>${scala.minor.version}.11</scala.version>
-			</properties>
-		</profile>
 		<profile>
 			<id>release-sonatype</id>
 			<distributionManagement>
@@ -142,14 +128,14 @@
 		<skip.assembly>true</skip.assembly>
 		<noLinkWarnings>-unchecked</noLinkWarnings>
 
-		<maven.compiler.source>1.8</maven.compiler.source>
-		<maven.compiler.target>1.8</maven.compiler.target>
-		<maven.compiler.release>8</maven.compiler.release>
+		<maven.compiler.release>17</maven.compiler.release>
+		<maven.compiler.source>17</maven.compiler.source>
+		<maven.compiler.target>17</maven.compiler.target>
 
-		<scala.minor.version>2.12</scala.minor.version>
+		<scala.minor.version>2.13</scala.minor.version>
 		<scala.version>${scala.minor.version}.17</scala.version>
 
-		<spark.version>3.5.5</spark.version>
+		<spark.version>4.1.1</spark.version>
 		<confluent.version>7.6.0</confluent.version>
 		<jackson.version>2.15.2</jackson.version>
 		<scalatest.version>3.2.2</scalatest.version>
@@ -242,21 +228,6 @@
 						<jvmArg>-Xmx1024m</jvmArg>
 					</jvmArgs>
 				</configuration>
-			</plugin>
-
-			<!-- rewrite pom for compiling with different scala version profiles -->
-			<plugin>
-				<groupId>org.spurint.maven.plugins</groupId>
-				<artifactId>scala-cross-maven-plugin</artifactId>
-				<version>0.3.0</version>
-				<executions>
-					<execution>
-						<id>rewrite-pom</id>
-						<goals>
-							<goal>rewrite-pom</goal>
-						</goals>
-					</execution>
-				</executions>
 			</plugin>
 
 			<!-- Copies files in resources folders to target folder. -->
@@ -391,14 +362,6 @@
 	</dependencyManagement>
 
 	<dependencies>
-
-		<!-- make scala 2.13 collection api changes available in scala 2.12 -->
-		<dependency>
-			<groupId>org.scala-lang.modules</groupId>
-			<artifactId>scala-collection-compat_${scala.minor.version}</artifactId>
-			<version>2.11.0</version>
-			<scope>provided</scope>
-		</dependency>
 
 		<dependency>
 			<groupId>ch.zzeekk.spark</groupId>

@@ -32,7 +32,6 @@ import org.apache.spark.sql.connector.catalog.CatalogManager
 import org.apache.spark.sql.custom.ExpressionEvaluator.{findUnresolvedAttributes, resolveExpression}
 import org.apache.spark.sql.internal.SQLConf
 import org.apache.spark.sql.types.{DataType, StructType}
-import org.apache.spark.sql.{Column, Encoders}
 
 import scala.reflect.runtime.universe._
 import scala.reflect.{ClassTag, classTag}
@@ -51,7 +50,7 @@ class ExpressionEvaluator[T<:Product:TypeTag, R:TypeTag:ClassTag](exprCol: Expre
   val classTagR: ClassTag[R] = classTag[R]
 
   // prepare evaluator (this is Spark internal API)
-  private val dataEncoder = Encoders.product[T].asInstanceOf[ExpressionEncoder[T]]
+  private val dataEncoder = ExpressionEncoder[T]()
   private val dataSerializer = dataEncoder.createSerializer()
   private val expr = SQLConf.withExistingConf(ExpressionEvaluator.sqlConf) {
     resolveExpression(exprCol, dataEncoder.schema)
@@ -161,7 +160,7 @@ object ExpressionEvaluator extends Logging {
    */
   def resolveExpression(exprCol: Expression, schema: StructType): Expression = {
     val attributes = DataTypeUtils.toAttributes(schema)
-    val localRelation = createLocalRelation(attributes)
+    val localRelation = LocalRelation(attributes:_*)
     val rawPlan = Project(Seq(Alias(exprCol, "exprCol")()), localRelation)
     val resolvedPlan = analyzer.execute(rawPlan)
     val optimizedPlan = optimizerRules.foldLeft(resolvedPlan) {
@@ -169,21 +168,6 @@ object ExpressionEvaluator extends Logging {
     }
     val resolvedExpr = optimizedPlan.asInstanceOf[Project].projectList.head
     BindReferences.bindReference(resolvedExpr, attributes)
-  }
-
-  /**
-   * Constructor for LocalRelation has changed with Spark4. It has an additional boolean parameter.
-   * Databricks runtime 16.4 with Scala 2.13 uses Spark3 with some backports from Spark4, amongst others the LocalRelation class.
-   * This method dynamically creates a LocalRelation for both cases, checking the constructors available.
-   */
-  def createLocalRelation(attributes: Seq[Attribute]): LocalRelation = {
-    val cls = this.getClass.getClassLoader.loadClass("org.apache.spark.sql.catalyst.plans.logical.LocalRelation")
-    val constructors = cls.getConstructors
-    val spark3Constructor = constructors.find(_.getParameterTypes.toSeq == Seq(classOf[Seq[_]], classOf[Seq[_]], java.lang.Boolean.TYPE))
-      .map(_.newInstance(attributes, Seq(), java.lang.Boolean.FALSE).asInstanceOf[LocalRelation])
-    val spark4Constructor = constructors.find(_.getParameterTypes.toSeq == Seq(classOf[Seq[_]], classOf[Seq[_]], java.lang.Boolean.TYPE, classOf[Option[_]]))
-      .map(_.newInstance(attributes, Seq(), java.lang.Boolean.FALSE, None).asInstanceOf[LocalRelation])
-    spark3Constructor.orElse(spark4Constructor).getOrElse(throw new RuntimeException("constructor for LocalRelation not found"))
   }
 
   /**

@@ -17,16 +17,16 @@
 
 package org.apache.spark.sql.confluent
 
-import io.confluent.kafka.schemaregistry.{ParsedSchema, SchemaProvider}
 import io.confluent.kafka.schemaregistry.avro.AvroSchemaProvider
 import io.confluent.kafka.schemaregistry.client.{CachedSchemaRegistryClient, SchemaRegistryClient}
 import io.confluent.kafka.schemaregistry.json.JsonSchemaProvider
+import io.confluent.kafka.schemaregistry.{ParsedSchema, SchemaProvider}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.Column
+import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.confluent.SubjectType.SubjectType
 
-import scala.jdk.CollectionConverters._
 import scala.collection.mutable
+import scala.jdk.CollectionConverters._
 
 /**
  * Wrapper for schema registry client.
@@ -86,14 +86,15 @@ class ConfluentClient[S <: ParsedSchema](schemaRegistryUrl: String) extends Logg
    * @return confluent schemaId and registered schema
    */
   def setOrGetSchema(subject: String, newSchema: S): (Int, S) = {
-
     if (!schemaExists(subject)) return registerSchema(subject, newSchema)
     getLatestSchemaFromConfluent(subject)
   }
 
   def getLatestSchemaFromConfluent(subject: String): (Int, S) = {
-    val m = sr.getLatestSchemaMetadata(subject)
-    getSchemaFromConfluent(m.getId)
+    val maxVersion = sr.getAllVersions(subject).asScala.max
+    val meta = sr.getSchemaMetadata(subject, maxVersion)
+    val schema = sr.getSchemaById(meta.getId)
+    (meta.getId, schema.asInstanceOf[S])
   }
 
   def getSchemaFromConfluent(id: Int): (Int, S) = {
@@ -140,8 +141,9 @@ trait ConfluentConnector extends Serializable {
    * @param data the binary column.
    * @param topic the topic name.
    * @param subjectType the subject type (key or value).
+   * @param options options for interpreting avro schema, see also Spark Avro DataSource options
    */
-  def from_confluent(data: Column, topic: String, subjectType: SubjectType): Column
+  def from_confluent(data: Expression, topic: String, subjectType: SubjectType, options: Map[String,String] = Map()): Expression
 
   /**
    * Convert a column from Spark to confluent format.
@@ -152,7 +154,7 @@ trait ConfluentConnector extends Serializable {
    * @param mutualReadCheck if a mutual read check or a simpler can read check should be executed
    * @param eagerCheck if true tiggers instantiation of converter object instances (only if connector uses such mechanisms)
    */
-  def to_confluent(data: Column, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Column
+  def to_confluent(data: Expression, topic: String, subjectType: SubjectType, updateAllowed: Boolean = false, mutualReadCheck: Boolean = false, eagerCheck: Boolean = false): Expression
 
 }
 
