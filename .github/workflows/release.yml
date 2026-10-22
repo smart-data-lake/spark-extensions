@@ -6,6 +6,11 @@ on:
       - 'master-spark*'
     types: [closed]
 
+  # allow for manual releases (in case of problems)
+  workflow_dispatch:
+    branches:
+      - 'master-spark*'
+
 permissions:
   contents: write
 
